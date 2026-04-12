@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Test Plan"
+  short_description: "Create a phased repo-wide testing roadmap"
+  default_prompt: "Use $helper-test-plan to create or refresh the repo-wide automated testing roadmap from current baseline data, saved preferences, and measured test gaps."

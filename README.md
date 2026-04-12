@@ -4,6 +4,11 @@
 [TimesFM](https://github.com/google-research/timesfm)  is a time series foundation model released by Google in 2024. This repo contains code following this [work](https://tech.preferred.jp/en/blog/timesfm/) , fine-tuning TimesFM on financial data, aligning towards the task of price prediction.
 
 ## Installation
+This repository targets the original TimesFM v1 API. As of the current upstream
+TimesFM project, the old 1.0/2.0 checkpoints should be used with
+`timesfm==1.3.0`. This repo is now wired to that compatibility layer for the
+v1 checkpoint family.
+
 The `timesfm` package can only be installed in *Python 3.10* due to package conflicts. Ensure that you have the correct Python version installed, which in conda can be done with 
 
 ```bash
@@ -14,10 +19,115 @@ conda activate myenv
 and then installing the package:
 
 ```bash
-pip install timesfm
+pip install timesfm==1.3.0
 ```
 
 To run the AR1 model in `mock_trading.ipynb`, you will also need the `statsmodels` package. 
+
+## Quick start: run the finance-tuned checkpoint
+
+This repo now includes a minimal inference script at `src/run_forecast.py` and
+an optional Windows bootstrap script at `scripts/setup_windows.ps1`.
+
+Important platform note:
+
+- The published finance checkpoint is a JAX/PAX checkpoint
+- Native Windows installs hit a `lingvo` dependency wall, so the practical path is Linux, WSL, or Docker
+- The Docker path below is the recommended way to run this checkpoint on a Windows host
+
+### Docker quick start
+
+Build the image:
+
+```bash
+docker build -t timesfm-fin .
+```
+
+Run a forecast and write the output back into this repo:
+
+```bash
+docker run --rm -v "${PWD}:/workspace" timesfm-fin --ticker AAPL --period 3y --horizon-len 16 --output-csv /workspace/outputs/aapl_forecast.csv
+```
+
+Run a rolling accuracy benchmark across multiple tickers:
+
+```bash
+docker run --rm --entrypoint python -v "${PWD}:/workspace" timesfm-fin src/evaluate_forecast.py --tickers AAPL MSFT NVDA --period 5y --horizon-len 16 --test-points 128 --stride 4 --output-csv /workspace/outputs/eval_summary.csv
+```
+
+### Manual setup on Linux or WSL
+
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install "timesfm[pax]==1.3.0"
+pip install -r requirements.inference.txt
+python src/run_forecast.py --ticker AAPL --period 3y --horizon-len 16
+```
+
+Important notes:
+
+- The default checkpoint is the finance-tuned model: `pfnet/timesfm-1.0-200m-fin`
+- `--freq 0` is the correct default for daily-or-higher-frequency financial data
+- The finance checkpoint is published under `CC BY-NC-SA 4.0`; review the model card before commercial use
+- This is a forecasting demo only, not investment advice
+
+You can also run the model on your own CSV:
+
+```bash
+python src/run_forecast.py --csv /path/to/prices.csv --column Close --date-column Date --horizon-len 16
+```
+
+Or benchmark a CSV with a rolling backtest:
+
+```bash
+python src/evaluate_forecast.py --csv /path/to/prices.csv --column Close --date-column Date --horizon-len 16 --test-points 128
+```
+
+The rolling evaluator reports:
+
+- `mae`, `rmse`, `mape_pct`, `smape_pct` over all predicted points
+- `step1_mae` and `step1_rmse` for the first step ahead
+- `step1_directional_accuracy` and `end_directional_accuracy` for price direction checks
+
+## Crypto minute backtest with SQLite
+
+For a rolling crypto experiment on Binance 1-minute candles, use
+`src/crypto_minute_backtest.py`. It fetches one full UTC day of `BTCUSDT`
+history into SQLite, runs a rolling TimesFM backtest across that day, stores
+every forecast window in SQLite, and saves summary metrics including Sharpe and
+standard deviation / annualized volatility.
+
+Example:
+
+```bash
+python src/crypto_minute_backtest.py --day 2026-04-11 --db-path outputs/crypto_backtest.sqlite --context-len 512 --horizon-len 16 --batch-size 64
+```
+
+From the VS Code terminal on Windows, the simplest path is the PowerShell
+wrapper below. It builds the Docker image if needed and runs the backtest from
+your current repo checkout. The wrapper defaults to `gpu` and requests Docker
+GPU access automatically:
+
+```powershell
+.\scripts\run_crypto_backtest.ps1 -Day 2026-04-11
+```
+
+You can pass the main tuning knobs directly from the terminal as well:
+
+```powershell
+.\scripts\run_crypto_backtest.ps1 -Day 2026-04-11 -Symbol BTCUSDT -ContextLen 512 -HorizonLen 16 -BatchSize 64
+```
+
+The script writes three SQLite tables:
+
+- `candles`: raw 1-minute OHLCV candles from Binance
+- `backtest_runs`: one row per completed experiment with summary metrics
+- `backtest_predictions`: one row per rolling forecast window with predicted and actual paths
+
+Runtime note:
+
+- The model load uses the same TimesFM runtime as `src/run_forecast.py`, so you still need a working `timesfm[pax]==1.3.0` or equivalent supported environment such as Linux, WSL, or Docker
 
 ## Data
 The fine-tuning dataset is proprietary and not publicly available. However, you can download the necessary data using the following APIs:
@@ -34,7 +144,7 @@ python src/main.py --workdir=/path/to/workdir --config=configs/fine_tuning.py --
 
 Replace `/path/to/workdir` and `/path/to/dataset` with your local paths.
 Logs, tensorboard data and checkpoints will be stored in `workdir`.
-`src/fine-tuning.py` contains the necessary configurations for fine-tuning. A brief summary of the hyperparameter settings is found here:
+`configs/fine_tuning.py` contains the necessary configurations for fine-tuning. A brief summary of the hyperparameter settings is found here:
 
 | Hyperparameter/Architecture    | Setting                           |
 |--------------------------------|-----------------------------------|

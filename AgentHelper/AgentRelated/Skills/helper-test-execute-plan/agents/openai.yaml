@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Test Execute Plan"
+  short_description: "Execute one wave from an existing testing plan"
+  default_prompt: "Use $helper-test-execute-plan to execute the requested or next unfinished wave from an existing automated test plan, invoke the local-cover and audit helper workflows explicitly, update GLOBAL_AUTOTEST_EXECUTION.md with wave status and blockers, and end with the exact next command to run."

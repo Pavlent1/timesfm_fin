@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper QA Agent"
+  short_description: "Route QA analysis, planning, execution, and handoff"
+  default_prompt: "Use $helper-qa-agent to decide whether this repository needs test analysis, a test plan, execution of that plan, or a planner-ready QA handoff."

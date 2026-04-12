@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Map Codebase"
+  short_description: "Map approved codebase files into DescriptionFiles"
+  default_prompt: "Use $helper-map-codebase to recommend or load the approved codebase scope, save it if needed, and map or verify file descriptions under AgentHelper/ProjectFiles/DescriptionFiles."

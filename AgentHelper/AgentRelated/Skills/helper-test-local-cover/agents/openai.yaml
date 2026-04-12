@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Test Local Cover"
+  short_description: "Add the smallest correct tests for changed code"
+  default_prompt: "Use $helper-test-local-cover to inspect the changed scope, choose the smallest correct test level, add or improve the local tests, and rerun the narrowest relevant validation command."

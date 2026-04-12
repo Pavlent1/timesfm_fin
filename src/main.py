@@ -35,7 +35,7 @@ def main(argv):
   checkpoint_path = FLAGS.checkpoint_path
   config.dataset_path = FLAGS.dataset_path
 
-  tfm = timesfm.TimesFm(
+  hparams = timesfm.TimesFmHparams(
     context_len=512,
     horizon_len=128, # TODO: why does setting horizon_len to 512 not work
     input_patch_len=32,
@@ -46,9 +46,17 @@ def main(argv):
   )
 
   if checkpoint_path is not None:
-    tfm.load_from_checkpoint(checkpoint_path)
+    checkpoint = timesfm.TimesFmCheckpoint(
+      version='jax',
+      path=checkpoint_path,
+    )
   else:
-    tfm.load_from_checkpoint(repo_id="google/timesfm-1.0-200m")
+    checkpoint = timesfm.TimesFmCheckpoint(
+      version='jax',
+      huggingface_repo_id="google/timesfm-1.0-200m",
+    )
+
+  tfm = timesfm.TimesFm(hparams=hparams, checkpoint=checkpoint)
   
   if do_eval:
     evaluation.restore_and_evaluate(tfm, config, workdir)

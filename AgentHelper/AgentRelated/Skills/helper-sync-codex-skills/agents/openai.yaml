@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Sync Codex Skills"
+  short_description: "Mirror AgentHelper skills into .codex/skills"
+  default_prompt: "Use $helper-sync-codex-skills to refresh the repo-local .codex/skills mirror from AgentHelper reusable skills and verify the requested helper skills are now available there."
