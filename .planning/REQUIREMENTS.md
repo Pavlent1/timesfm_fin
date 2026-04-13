@@ -56,23 +56,23 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RUNT-01 | Phase 1 | Pending |
-| RUNT-02 | Phase 1 | Pending |
-| DATA-01 | Phase 2 | Pending |
-| DATA-02 | Phase 2 | Pending |
-| DATA-03 | Phase 2 | Pending |
-| EVAL-01 | Phase 3 | Pending |
-| EVAL-02 | Phase 4 | Pending |
-| EVAL-03 | Phase 3 | Pending |
-| SAFE-01 | Phase 4 | Pending |
-| TRNG-01 | Phase 5 | Pending |
-| TRNG-02 | Phase 5 | Pending |
+| RUNT-01 | Unmapped | Pending |
+| RUNT-02 | Unmapped | Pending |
+| DATA-01 | Unmapped | Pending |
+| DATA-02 | Unmapped | Pending |
+| DATA-03 | Unmapped | Pending |
+| EVAL-01 | Unmapped | Pending |
+| EVAL-02 | Unmapped | Pending |
+| EVAL-03 | Unmapped | Pending |
+| SAFE-01 | Unmapped | Pending |
+| TRNG-01 | Unmapped | Pending |
+| TRNG-02 | Unmapped | Pending |
 
 **Coverage:**
 - v1 requirements: 11 total
-- Mapped to phases: 11
-- Unmapped: 0
+- Mapped to phases: 0
+- Unmapped: 11
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after initial definition*
+*Last updated: 2026-04-13 after removing all roadmap phases*
