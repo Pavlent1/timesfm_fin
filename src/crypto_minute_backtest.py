@@ -5,18 +5,15 @@ import sqlite3
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
-from urllib.parse import urlencode
-from urllib.request import Request, urlopen
 
 import numpy as np
 import pandas as pd
 
+from binance_market_data import ONE_MINUTE_MS, fetch_binance_klines, to_utc_iso
 from evaluate_forecast import directional_accuracy, mape, smape
 from run_forecast import DEFAULT_REPO_ID, build_model
 
 
-BINANCE_KLINES_URL = "https://api.binance.com/api/v3/klines"
-ONE_MINUTE_MS = 60_000
 MINUTES_PER_YEAR = 365 * 24 * 60
 
 
@@ -131,15 +128,6 @@ def latest_closed_minute_bounds(context_len: int) -> tuple[datetime, datetime]:
     return start_dt, end_dt
 
 
-def to_utc_iso(timestamp_ms: int) -> str:
-    return (
-        datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
-
-
 def ensure_schema(conn: sqlite3.Connection) -> None:
     conn.execute(
         """
@@ -229,52 +217,6 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
         ON candles (exchange, symbol, interval, open_time_ms)
         """
     )
-
-
-def fetch_binance_klines(
-    symbol: str,
-    start_ms: int,
-    end_ms: int,
-    interval: str = "1m",
-    limit: int = 1000,
-) -> list[list]:
-    all_rows: list[list] = []
-    cursor = start_ms
-
-    while cursor < end_ms:
-        params = urlencode(
-            {
-                "symbol": symbol,
-                "interval": interval,
-                "startTime": cursor,
-                "endTime": end_ms,
-                "limit": limit,
-            }
-        )
-        request = Request(
-            f"{BINANCE_KLINES_URL}?{params}",
-            headers={"User-Agent": "timesfm-fin/crypto-minute-backtest"},
-        )
-        with urlopen(request, timeout=30) as response:
-            batch = json.loads(response.read().decode("utf-8"))
-
-        if not isinstance(batch, list):
-            raise ValueError(f"Unexpected Binance response: {batch!r}")
-        if not batch:
-            break
-
-        all_rows.extend(batch)
-        next_cursor = int(batch[-1][0]) + ONE_MINUTE_MS
-        if next_cursor <= cursor:
-            raise RuntimeError("Binance pagination stalled while fetching klines.")
-        cursor = next_cursor
-
-    unique_rows = {int(row[0]): row for row in all_rows}
-    return [
-        unique_rows[open_time]
-        for open_time in sorted(unique_rows)
-        if start_ms <= open_time < end_ms
-    ]
 
 
 def store_candles(
