@@ -90,6 +90,61 @@ The rolling evaluator reports:
 - `step1_mae` and `step1_rmse` for the first step ahead
 - `step1_directional_accuracy` and `end_directional_accuracy` for price direction checks
 
+## PostgreSQL Phase 1 data foundation
+
+Phase 1 adds a repo-owned PostgreSQL workflow for storing, inspecting, verifying,
+and exporting 1-minute close-price datasets without turning the existing
+forecasting and training entrypoints into direct database readers yet.
+
+Start the local database:
+
+```bash
+docker compose up -d postgres
+```
+
+Apply or re-apply the checked-in schema:
+
+```bash
+python src/bootstrap_postgres.py
+```
+
+Load the default Binance BTCUSDT 1-minute dataset:
+
+```bash
+python src/postgres_ingest_binance.py
+```
+
+Inspect what data exists:
+
+```bash
+python src/postgres_discover_data.py --source binance --timeframe 1m
+```
+
+Run integrity verification:
+
+```bash
+python src/postgres_verify_data.py --source binance --timeframe 1m
+```
+
+Export one chronological series for the current forecasting scripts:
+
+```bash
+python src/postgres_materialize_dataset.py --mode series_csv --source binance --symbol BTCUSDT --timeframe 1m --output-csv outputs/btc_series.csv
+```
+
+Export an aligned multi-series matrix for the current `train.py` CSV preprocessing path:
+
+```bash
+python src/postgres_materialize_dataset.py --mode training_matrix --source binance --timeframe 1m --output-csv outputs/training_matrix.csv
+```
+
+Notes:
+
+- `series_csv` writes `Date` and `Close` columns that `src/run_forecast.py` and `src/evaluate_forecast.py` can read directly.
+- `training_matrix` writes numeric-only aligned series columns so the existing `src/train.py` preprocessing flow can consume the export without manual reshaping.
+- The PostgreSQL service is a local development dependency, not a hosted or shared production service.
+- Schema details live in `db/README.md`.
+
 ## Crypto minute backtest with SQLite
 
 For a rolling crypto experiment on Binance 1-minute candles, use
