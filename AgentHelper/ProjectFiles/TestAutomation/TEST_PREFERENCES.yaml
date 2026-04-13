@@ -1,0 +1,92 @@
+version: 1
+status:
+  overall: draft
+  confirmation_state: scaffolded_defaults_only
+  user_input_mode: defaults_requested
+created_at: "2026-04-13T21:16:13Z"
+updated_at: "2026-04-13T21:16:13Z"
+sources:
+  skill: helper-test-preferences
+  discovery_method: manual_repo_inspection
+  notes:
+    - Required discovery script `scripts/testing/discover-test-landscape.mjs` was not present in the repository, so runner detection came from direct repo inspection.
+repo_snapshot:
+  captured_at: "2026-04-13T21:16:13Z"
+  detected_runners:
+    unit:
+      - pytest
+    integration:
+      - pytest
+    e2e: []
+  detected_test_paths:
+    - tests/
+  detected_integration_dependencies:
+    - docker compose
+    - PostgreSQL
+  detected_constraints:
+    - Current integration-style tests depend on a compose-managed PostgreSQL service.
+    - No browser-facing application surface or E2E runner is configured.
+confirmed_policy: {}
+scaffolded_defaults:
+  coverage:
+    status: unconfirmed
+    mode: advisory
+    hard_threshold_percent: null
+    expectations:
+      - Prefer targeted coverage for changed code.
+      - Prioritize critical data and CLI flows over a repo-wide percentage target.
+  runners:
+    status: unconfirmed
+    unit:
+      preferred: pytest
+      alternatives: []
+    integration:
+      preferred: pytest
+      notes:
+        - Use the existing pytest suite for integration-style coverage.
+        - Expect Docker Compose and PostgreSQL when tests exercise database flows.
+    e2e:
+      preferred: none
+      notes:
+        - No E2E runner is configured in the current repo state.
+  playwright:
+    status: unconfirmed
+    preferred: false
+    allowed_target_surface: none
+    notes:
+      - Revisit only if the repository adds a browser-facing or interactive app surface.
+  execution_policy:
+    status: unconfirmed
+    precommit: not_set
+    pull_request: not_set
+    post_push_ci: not_set
+    nightly: not_set
+  mocking_rules:
+    status: unconfirmed
+    default: not_set
+    notes:
+      - No React or frontend hook-mocking policy is relevant to the current repository shape.
+  change_policy:
+    status: unconfirmed
+    bugfixes:
+      - Add or update the smallest relevant pytest coverage when behavior changes.
+    refactors:
+      - Preserve existing coverage and add characterization tests around touched behavior when practical.
+    production_file_edits:
+      - Run the narrowest relevant pytest scope for affected code when practical.
+  critical_flows:
+    status: unconfirmed
+    items:
+      - PostgreSQL schema bootstrap and connection setup
+      - Binance ingestion and provenance tracking
+      - Discovery and integrity reporting CLI behavior
+      - PostgreSQL-to-CSV materialization behavior
+  intentionally_light_tested_areas:
+    status: unconfirmed
+    items:
+      - Legacy training and evaluation modules that depend on the JAX/PAX TimesFM stack
+      - Docker and external-service execution paths not fully exercised by the current pytest suite
+open_questions:
+  - Confirm CI-stage execution policy for precommit, pull requests, post-push, and nightly runs.
+  - Confirm whether any hard coverage threshold should exist.
+  - Confirm mocking rules if the repository later adds frontend or React surfaces.
