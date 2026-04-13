@@ -66,7 +66,7 @@ None yet.
 
 ### Blockers/Concerns
 
-- Requirements are still unmapped and likely need to be rewritten around the new PostgreSQL/data workflow.
+- The roadmap currently has only Phase 1; later phases will need to be added once the data foundation scope is clearer.
 
 ## Session Continuity
 

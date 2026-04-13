@@ -17,7 +17,7 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
 ### Phase 1: Set up PostgreSQL database, download and discover all data, add sorting and organization
 
 **Goal:** Establish the first real data layer using PostgreSQL so the project can ingest, inspect, sort, and organize the datasets it will depend on.
-**Requirements**: TBD
+**Requirements**: [DB-01, DB-02, DB-03, ING-01, ING-02, ING-03, DISC-01, DISC-02, DISC-03]
 **Depends on:** Nothing (first phase)
 **Success Criteria** (what must be TRUE):
   1. A PostgreSQL database is set up and reachable from the project runtime.

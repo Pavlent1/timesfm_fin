@@ -19,11 +19,10 @@ Users can run reproducible financial forecasting and backtesting workflows with 
 
 ### Active
 
-- [ ] Make supported runtime setup reproducible for inference, evaluation, and backtesting.
-- [ ] Add stronger input validation and output provenance so runs are easier to trust and debug.
-- [ ] Add automated tests around metrics, forecasting entrypoints, and backtest flows.
-- [ ] Improve performance and operational safety in the evaluation and Docker-backed backtest paths.
-- [ ] Make the fine-tuning path reproducible and config-driven instead of experiment-harness driven.
+- [ ] Establish a PostgreSQL-backed data foundation for financial datasets.
+- [ ] Download or import the target datasets into PostgreSQL through repeatable project workflows.
+- [ ] Make stored data easy to discover, sort, and filter by symbol, source, timeframe, and date range.
+- [ ] Document the schema and ingestion flow so later modeling phases build on a clear data layer.
 
 ### Out of Scope
 
@@ -56,6 +55,7 @@ The current codebase also carries known risks that should shape planning: duplic
 | Treat this as a brownfield hardening effort, not a greenfield redesign | The repo already has working forecast, evaluation, and backtest paths that should be stabilized before larger migrations | Pending |
 | Keep Docker as the primary supported Windows execution path | The documented Windows story already depends on containerized or Linux-like execution for the model runtime | Pending |
 | Prioritize trust and reproducibility over adding novel product features | The biggest current risks are incorrect metrics, unsupported environments, and unverified workflows | Pending |
+| Start the new roadmap with a PostgreSQL-backed data foundation | Later modeling work depends on having discoverable, organized, queryable historical data | Pending |
 
 ## Evolution
 
@@ -75,4 +75,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after initialization*
+*Last updated: 2026-04-13 after requirements rewrite*
