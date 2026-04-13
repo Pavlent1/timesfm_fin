@@ -1,10 +1,10 @@
 version: 1
 status:
   overall: draft
-  confirmation_state: scaffolded_defaults_only
+  confirmation_state: partially_confirmed
   user_input_mode: defaults_requested
 created_at: "2026-04-13T21:16:13Z"
-updated_at: "2026-04-13T21:16:13Z"
+updated_at: "2026-04-13T21:21:24Z"
 sources:
   skill: helper-test-preferences
   discovery_method: manual_repo_inspection
@@ -26,7 +26,19 @@ repo_snapshot:
   detected_constraints:
     - Current integration-style tests depend on a compose-managed PostgreSQL service.
     - No browser-facing application surface or E2E runner is configured.
-confirmed_policy: {}
+confirmed_policy:
+  execution_policy:
+    confirmed_at: "2026-04-13T21:21:24Z"
+    precommit:
+      mode: repo_managed_git_hook
+      command: node scripts/precommit-checks.mjs
+      hook_path: .githooks/pre-commit
+      hooks_path_config: .githooks
+      test_scope: full_pytest_suite
+      notes:
+        - The hook prefers the repository `.venv` Python interpreter when present.
+        - The current suite includes Docker Compose backed PostgreSQL integration tests.
+        - The hook fails before pytest when Docker is not reachable, because the full suite depends on it.
 scaffolded_defaults:
   coverage:
     status: unconfirmed
@@ -57,7 +69,7 @@ scaffolded_defaults:
       - Revisit only if the repository adds a browser-facing or interactive app surface.
   execution_policy:
     status: unconfirmed
-    precommit: not_set
+    precommit: confirmed_in_confirmed_policy
     pull_request: not_set
     post_push_ci: not_set
     nightly: not_set
@@ -87,6 +99,6 @@ scaffolded_defaults:
       - Legacy training and evaluation modules that depend on the JAX/PAX TimesFM stack
       - Docker and external-service execution paths not fully exercised by the current pytest suite
 open_questions:
-  - Confirm CI-stage execution policy for precommit, pull requests, post-push, and nightly runs.
+  - Confirm CI-stage execution policy for pull requests, post-push, and nightly runs.
   - Confirm whether any hard coverage threshold should exist.
   - Confirm mocking rules if the repository later adds frontend or React surfaces.
