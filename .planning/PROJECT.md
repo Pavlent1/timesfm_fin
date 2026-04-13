@@ -16,13 +16,15 @@ Users can run reproducible financial forecasting and backtesting workflows with 
 - [x] Run rolling evaluation over one or more series and report forecast error plus directional metrics.
 - [x] Execute a BTCUSDT 1-minute backtest or live forecast flow with SQLite persistence for runs and per-window predictions.
 - [x] Launch a research-oriented fine-tuning or checkpoint evaluation flow against a local financial dataset using the TimesFM v1 stack.
+- [x] Establish a PostgreSQL-backed data foundation for financial datasets. Validated in Phase 1.
+- [x] Download or import the target datasets into PostgreSQL through repeatable project workflows. Validated in Phase 1.
+- [x] Make stored data easy to discover, sort, and filter by symbol, source, timeframe, and date range. Validated in Phase 1.
+- [x] Document the schema and ingestion flow so later modeling phases build on a clear data layer. Validated in Phase 1.
 
 ### Active
 
-- [ ] Establish a PostgreSQL-backed data foundation for financial datasets.
-- [ ] Download or import the target datasets into PostgreSQL through repeatable project workflows.
-- [ ] Make stored data easy to discover, sort, and filter by symbol, source, timeframe, and date range.
-- [ ] Document the schema and ingestion flow so later modeling phases build on a clear data layer.
+- [ ] Evaluate which later workflows should read PostgreSQL directly instead of consuming CSV materializations.
+- [ ] Decide how recurring refreshes or scheduled PostgreSQL ingestion should work once the batch foundation is stable.
 
 ### Out of Scope
 
@@ -39,6 +41,10 @@ Recent repository work already moved part of the project toward a more usable to
 
 The current codebase also carries known risks that should shape planning: duplicated metric logic, a monolithic crypto backtest file, remote model/data inputs without provenance controls, and missing automated tests across the main CLI flows. Those gaps matter because this repository's value depends more on trustworthy execution than on adding broad new feature surface.
 
+## Current State
+
+Phase 1 is complete. The repo now has a Docker-managed PostgreSQL data layer with checked-in schema bootstrap, repeatable Binance ingestion, dataset discovery and integrity CLIs, and CSV materialization back into the existing forecasting and training flows.
+
 ## Constraints
 
 - **Tech stack**: Python 3.10 plus the legacy TimesFM v1 / JAX / PAX ecosystem - the repository is intentionally aligned to the older checkpoint family.
@@ -53,9 +59,9 @@ The current codebase also carries known risks that should shape planning: duplic
 |----------|-----------|---------|
 | Keep TimesFM v1 compatibility as the current platform target | The repository, README, and checkpoint support are all anchored to the legacy TimesFM finance checkpoint family | Pending |
 | Treat this as a brownfield hardening effort, not a greenfield redesign | The repo already has working forecast, evaluation, and backtest paths that should be stabilized before larger migrations | Pending |
-| Keep Docker as the primary supported Windows execution path | The documented Windows story already depends on containerized or Linux-like execution for the model runtime | Pending |
-| Prioritize trust and reproducibility over adding novel product features | The biggest current risks are incorrect metrics, unsupported environments, and unverified workflows | Pending |
-| Start the new roadmap with a PostgreSQL-backed data foundation | Later modeling work depends on having discoverable, organized, queryable historical data | Pending |
+| Keep Docker as the primary supported Windows execution path | The documented Windows story already depends on containerized or Linux-like execution for the model runtime | Validated in Phase 1 via Compose-managed PostgreSQL setup and docs |
+| Prioritize trust and reproducibility over adding novel product features | The biggest current risks are incorrect metrics, unsupported environments, and unverified workflows | Validated in Phase 1 via provenance tracking, integrity checks, and automated tests |
+| Start the new roadmap with a PostgreSQL-backed data foundation | Later modeling work depends on having discoverable, organized, queryable historical data | Validated in Phase 1 |
 
 ## Evolution
 
@@ -75,4 +81,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-13 after requirements rewrite*
+*Last updated: 2026-04-13 after Phase 1 completion*

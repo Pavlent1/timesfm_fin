@@ -10,7 +10,7 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions if needed later
 
-- [ ] **Phase 1: Set up PostgreSQL database, download and discover all data, add sorting and organization** - Build the initial data foundation for storing, exploring, and organizing the project dataset.
+- [x] **Phase 1: Set up PostgreSQL database, download and discover all data, add sorting and organization** - Build the initial data foundation for storing, exploring, and organizing the project dataset. Completed 2026-04-13.
 
 ## Phase Details
 
@@ -27,10 +27,10 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md - Compose-backed PostgreSQL foundation, schema bootstrap, and test harness
-- [ ] 01-02-PLAN.md - Idempotent Binance BTCUSDT ingestion with provenance tracking
-- [ ] 01-03-PLAN.md - Discovery, sorting, filtering, and integrity verification CLIs
-- [ ] 01-04-PLAN.md - PostgreSQL-to-CSV materialization bridge and Phase 1 docs
+- [x] 01-01-PLAN.md - Compose-backed PostgreSQL foundation, schema bootstrap, and test harness
+- [x] 01-02-PLAN.md - Idempotent Binance BTCUSDT ingestion with provenance tracking
+- [x] 01-03-PLAN.md - Discovery, sorting, filtering, and integrity verification CLIs
+- [x] 01-04-PLAN.md - PostgreSQL-to-CSV materialization bridge and Phase 1 docs
 
 ## Progress
 
@@ -39,4 +39,4 @@ Phases execute in numeric order: 1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 0/4 | Planned | - |
+| 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |

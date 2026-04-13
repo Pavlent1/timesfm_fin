@@ -7,21 +7,21 @@
 
 ### Database
 
-- [ ] **DB-01**: User can provision a PostgreSQL database and connect to it from the project runtime with one documented setup path.
-- [ ] **DB-02**: User can create the required PostgreSQL schema for assets, observations, and dataset metadata without manual ad hoc SQL edits.
-- [ ] **DB-03**: User can store financial time-series data in PostgreSQL with enough structure to query by symbol, source, timeframe, and date range.
+- [x] **DB-01**: User can provision a PostgreSQL database and connect to it from the project runtime with one documented setup path.
+- [x] **DB-02**: User can create the required PostgreSQL schema for assets, observations, and dataset metadata without manual ad hoc SQL edits.
+- [x] **DB-03**: User can store financial time-series data in PostgreSQL with enough structure to query by symbol, source, timeframe, and date range.
 
 ### Ingestion
 
-- [ ] **ING-01**: User can download or import the target market data into PostgreSQL through a repeatable project command or script.
-- [ ] **ING-02**: User can rerun ingestion without creating duplicate rows or silently corrupting existing data.
-- [ ] **ING-03**: User can track where imported data came from, when it was loaded, and what date range it covers.
+- [x] **ING-01**: User can download or import the target market data into PostgreSQL through a repeatable project command or script.
+- [x] **ING-02**: User can rerun ingestion without creating duplicate rows or silently corrupting existing data.
+- [x] **ING-03**: User can track where imported data came from, when it was loaded, and what date range it covers.
 
 ### Discovery And Organization
 
-- [ ] **DISC-01**: User can inspect which symbols, sources, and date ranges are currently available in the PostgreSQL dataset.
-- [ ] **DISC-02**: User can sort and filter stored data by symbol, source, timeframe, and date so the dataset is easy to explore.
-- [ ] **DISC-03**: User can understand the database schema and ingestion workflow from repository documentation without reverse-engineering the code.
+- [x] **DISC-01**: User can inspect which symbols, sources, and date ranges are currently available in the PostgreSQL dataset.
+- [x] **DISC-02**: User can sort and filter stored data by symbol, source, timeframe, and date so the dataset is easy to explore.
+- [x] **DISC-03**: User can understand the database schema and ingestion workflow from repository documentation without reverse-engineering the code.
 
 ## v2 Requirements
 
@@ -48,15 +48,15 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DB-01 | Phase 1 | Pending |
-| DB-02 | Phase 1 | Pending |
-| DB-03 | Phase 1 | Pending |
-| ING-01 | Phase 1 | Pending |
-| ING-02 | Phase 1 | Pending |
-| ING-03 | Phase 1 | Pending |
-| DISC-01 | Phase 1 | Pending |
-| DISC-02 | Phase 1 | Pending |
-| DISC-03 | Phase 1 | Pending |
+| DB-01 | Phase 1 | Satisfied |
+| DB-02 | Phase 1 | Satisfied |
+| DB-03 | Phase 1 | Satisfied |
+| ING-01 | Phase 1 | Satisfied |
+| ING-02 | Phase 1 | Satisfied |
+| ING-03 | Phase 1 | Satisfied |
+| DISC-01 | Phase 1 | Satisfied |
+| DISC-02 | Phase 1 | Satisfied |
+| DISC-03 | Phase 1 | Satisfied |
 
 **Coverage:**
 - v1 requirements: 9 total
@@ -65,4 +65,4 @@
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after rewriting requirements around PostgreSQL data foundation*
+*Last updated: 2026-04-13 after Phase 1 verification*
