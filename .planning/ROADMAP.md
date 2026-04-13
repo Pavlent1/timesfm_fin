@@ -24,10 +24,13 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
   2. The project can download or import the target datasets into the database in a repeatable way.
   3. The stored data can be explored, filtered, and sorted so the dataset structure is clear for later phases.
   4. The database schema and ingestion flow are documented well enough for Phase 1 planning.
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 1 to break down)
+- [ ] 01-01-PLAN.md - Compose-backed PostgreSQL foundation, schema bootstrap, and test harness
+- [ ] 01-02-PLAN.md - Idempotent Binance BTCUSDT ingestion with provenance tracking
+- [ ] 01-03-PLAN.md - Discovery, sorting, filtering, and integrity verification CLIs
+- [ ] 01-04-PLAN.md - PostgreSQL-to-CSV materialization bridge and Phase 1 docs
 
 ## Progress
 
@@ -36,4 +39,4 @@ Phases execute in numeric order: 1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 0/0 | Not planned yet | - |
+| 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 0/4 | Planned | - |
