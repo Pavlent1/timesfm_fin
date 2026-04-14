@@ -10,81 +10,85 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 ## Wave Summary
 
 - Overall status: `in_progress`
-- Current wave: `Wave 2`
-- Next wave: `Wave 3`
-- Current step: Wave 2 is complete and the audit artifacts now reflect the new shared-adapter and bootstrap coverage
-- Next step: start Wave 3 PostgreSQL workflow contract and Docker-backed integration hardening
-- Next recommended command: `Use $helper-test-execute-plan wave 3`
+- Current wave: `Wave 5`
+- Next wave: `None`
+- Current step: Waves 3 and 4 are complete and the audit artifacts now reflect the broader direct-coverage footprint
+- Next step: execute Wave 5 coverage refresh and deferral recording
+- Next recommended command: `Use $helper-test-execute-plan wave 5`
 
 ## Preflight
 
 - Date: `2026-04-14`
-- Result: `blocked`
-- Reason: `GLOBAL_AUTOTEST_PLAN.md` already existed under `AgentHelper/ProjectFiles/TestAutomation/`, but `GLOBAL_AUTOTEST_EXECUTION.md` did not exist, so no safe wave-tracking state was available.
-- Resolution applied in this run: created this execution log and recorded the blocker instead of starting Wave 1 blind.
+- Result: `resolved`
+- Original blocker: the execution log was missing when this workflow was first resumed on 2026-04-14
+- Resolution applied: the execution log was created, then maintained wave by wave so later runs can resume safely
 
 ## Waves
 
 | Wave | Status | Completed scopes | Commands run | Failures encountered | Blockers | Remaining risk |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | `complete` | Scope A `scripts/testing/` helper restoration; Scope B pytest marker/config split; Scope C audit refresh | `helper-test-execute-plan` preflight; `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 1 of the global autotest plan"`; `node scripts/testing/discover-test-landscape.mjs --markdown`; `node scripts/testing/measure-coverage.mjs --markdown`; `node scripts/testing/summarize-test-gaps.mjs --markdown`; `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`; `.\.venv\Scripts\python.exe -m pytest --collect-only -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs` | Resolved during scope work: gap summarizer initially counted docs-contract mentions as direct coverage; affected-test parsing initially mangled porcelain paths | None active | Coverage measurement is still unavailable because no plugin is installed; most integration tests still depend on Docker |
-| 2 | `complete` | Scope A `src/binance_market_data.py`; Scope B `src/bootstrap_postgres.py` | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"`; `node scripts/testing/classify-test-level.mjs --source src/binance_market_data.py --markdown`; `node scripts/testing/classify-test-level.mjs --source src/bootstrap_postgres.py --markdown`; `.\.venv\Scripts\python.exe -m pytest tests/test_binance_market_data.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_bootstrap_postgres.py -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/testing/discover-test-landscape.mjs --markdown`; `node scripts/testing/measure-coverage.mjs --markdown`; `node scripts/testing/summarize-test-gaps.mjs --markdown`; `node scripts/precommit-checks.mjs` | Resolved during scope work: `tests/test_bootstrap_postgres.py` initially asserted POSIX-style schema paths on Windows; `tests/test_testing_scripts.py` still expected the Wave 2 targets to appear as uncovered | None active | Wave 2 is complete, but Wave 3 and Wave 4 coverage gaps remain |
-| 3 | `pending` | None | None | None | Depends on Wave 1 and a Docker-ready environment for final validation | PostgreSQL integration coverage remains coupled to Docker availability |
-| 4 | `pending` | None | None | None | Depends on Waves 1-2 | Forecast and crypto workflow coverage remains absent |
-| 5 | `pending` | None | None | None | Depends on Waves 1-4 | Coverage refresh and deferral documentation remain stale until later waves land |
+| 1 | `complete` | Scope A `scripts/testing/` helper restoration; Scope B pytest marker/config split; Scope C audit refresh | `helper-test-execute-plan` preflight; `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 1 of the global autotest plan"`; helper-script validation; `.\.venv\Scripts\python.exe -m pytest --collect-only -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs` | Resolved during scope work: gap summarizer initially counted docs-contract mentions as direct coverage; affected-test parsing initially mangled porcelain paths | None active | Coverage measurement unavailable; later waves still pending |
+| 2 | `complete` | Scope A `src/binance_market_data.py`; Scope B `src/bootstrap_postgres.py` | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"`; classifier runs for Wave 2 sources; `.\.venv\Scripts\python.exe -m pytest tests/test_binance_market_data.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_bootstrap_postgres.py -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; helper-script refresh; `node scripts/precommit-checks.mjs` | Resolved during scope work: Windows path separator assertion mismatch in `tests/test_bootstrap_postgres.py`; stale gap-summary expectation in `tests/test_testing_scripts.py` | None active | PostgreSQL workflow contracts and forecast/backtest coverage still pending |
+| 3 | `complete` | Scope A fixture diagnostics and marker hygiene in `tests/conftest.py`; Scope B CLI contracts for ingest/provenance paths; Scope C CLI contracts for discovery/verify/materialize paths | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute waves 3 and 4 of the global autotest plan"`; classifier runs for `tests/conftest.py` and PostgreSQL CLI files; `docker info`; `.\.venv\Scripts\python.exe -m pytest tests/test_postgres_cli_contracts.py tests/test_postgres_fixture_diagnostics.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_db_connection.py tests/test_schema_bootstrap.py tests/test_binance_ingest.py tests/test_discovery_cli.py tests/test_materialize_dataset.py tests/test_provenance.py -q -m "docker"`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs` | Resolved during scope work: new discovery contract test initially omitted timestamp columns; fixture-diagnostics test initially used the wrong `CalledProcessError` payload field | None active | Docker is still required for the PostgreSQL integration slice, but failures are now more diagnosable and isolated |
+| 4 | `complete` | Scope A `src/run_forecast.py`; Scope B `src/evaluate_forecast.py`; Scope C `src/crypto_minute_backtest.py`; Scope D Windows wrapper contracts | classifier runs for Wave 4 sources and scripts; `.\.venv\Scripts\python.exe -m pytest tests/test_run_forecast.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_evaluate_forecast.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_crypto_minute_backtest.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_script_wrappers.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs`; audit refresh commands | Resolved during scope work: `tests/test_script_wrappers.py` exposed a real PowerShell interpolation bug in `scripts/setup_windows.ps1`; `tests/test_testing_scripts.py` still expected `src/crypto_minute_backtest.py` to appear as uncovered; `src/evaluate_forecast.py` emitted a pandas deprecation warning and was updated to avoid it | None active | Remaining direct-coverage gaps are now limited to legacy training/utilities, `configs/fine_tuning.py`, and `scripts/precommit-checks.mjs` |
+| 5 | `pending` | None | None | None | Depends on Waves 1-4 | Coverage measurement remains unavailable and explicit deferrals still need final recording |
 
-## Current Wave Detail
-
-### Wave 2
+## Wave 4 Detail
 
 - Status: `complete`
 - Completed scopes:
-  - Scope A: added `tests/test_binance_market_data.py` for retry, malformed payload, de-duplication, and stalled-pagination behavior
-  - Scope B: added `tests/test_bootstrap_postgres.py` for defaults, `--skip-wait`, schema-file plumbing, and main-command collaborator calls
+  - Scope A: added `tests/test_run_forecast.py` for CSV/Yahoo loading, future-index inference, model construction, and CLI output
+  - Scope B: added `tests/test_evaluate_forecast.py` for metric helpers, rolling-window aggregation, and result formatting
+  - Scope C: added `tests/test_crypto_minute_backtest.py` for SQLite persistence, live preparation, live forecast output, backtest metrics, and saved runs
+  - Scope D: added `tests/test_script_wrappers.py` for wrapper command contracts and fixed `scripts/setup_windows.ps1`
 - Commands run:
-  - `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"`
-  - `node scripts/testing/classify-test-level.mjs --source src/binance_market_data.py --markdown`
-  - `node scripts/testing/classify-test-level.mjs --source src/bootstrap_postgres.py --markdown`
-  - `.\.venv\Scripts\python.exe -m pytest tests/test_binance_market_data.py -q`
-  - `.\.venv\Scripts\python.exe -m pytest tests/test_bootstrap_postgres.py -q`
-  - `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`
-  - `node scripts/testing/discover-test-landscape.mjs --markdown`
-  - `node scripts/testing/measure-coverage.mjs --markdown`
-  - `node scripts/testing/summarize-test-gaps.mjs --markdown`
-  - `node scripts/precommit-checks.mjs`
-- Failures encountered:
-  - `tests/test_bootstrap_postgres.py` initially failed on Windows because the output assertion expected `/` instead of `\` in the printed schema path
-  - `tests/test_testing_scripts.py` still expected `src/binance_market_data.py` and `src/bootstrap_postgres.py` to appear in the gap summary after the new direct coverage landed
-- Blockers:
-  - None active
-- Remaining risk:
-  - Direct coverage is still missing for the forecast, evaluation, crypto backtest, wrapper, and legacy training surfaces targeted by later waves
-
-### Wave 1
-
-- Status: `complete`
-- Completed scopes:
-  - Scope A: restored `scripts/testing/` helper commands and added `tests/test_testing_scripts.py`
-  - Scope B: registered pytest markers and validated the non-Docker subset
-  - Scope C: refreshed `TEST_BASELINE.md`, `TEST_INVENTORY.md`, and `TEST_AUDIT.md`
-- Commands run:
-  - `helper-test-execute-plan` preflight
-  - `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "initialize autotest execution log blocker for helper-test-execute-plan preflight"`
-  - `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 1 of the global autotest plan"`
-  - `node scripts/testing/classify-test-level.mjs --source scripts/testing/discover-test-landscape.mjs --markdown`
-  - `node scripts/testing/classify-test-level.mjs --source tests/conftest.py --markdown`
-  - `node scripts/testing/find-affected-tests.mjs --markdown`
-  - `node scripts/testing/discover-test-landscape.mjs --markdown`
-  - `node scripts/testing/measure-coverage.mjs --markdown`
-  - `node scripts/testing/summarize-test-gaps.mjs --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/run_forecast.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/evaluate_forecast.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/crypto_minute_backtest.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source scripts/run_crypto_backtest.ps1 --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source scripts/setup_windows.ps1 --markdown`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_run_forecast.py -q`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_evaluate_forecast.py -q`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_crypto_minute_backtest.py -q`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_script_wrappers.py -q`
   - `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`
-  - `.\.venv\Scripts\python.exe -m pytest --collect-only -q`
   - `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`
   - `node scripts/precommit-checks.mjs`
+  - `node scripts/testing/discover-test-landscape.mjs --markdown`
+  - `node scripts/testing/measure-coverage.mjs --markdown`
+  - `node scripts/testing/summarize-test-gaps.mjs --markdown`
 - Failures encountered:
-  - `tests/test_testing_scripts.py` initially failed because the gap summary treated docs-contract mentions as direct coverage
-  - `scripts/testing/find-affected-tests.mjs` initially trimmed `git status --porcelain` output incorrectly for the first modified file
+  - `tests/test_script_wrappers.py` found that `scripts/setup_windows.ps1` used `$LASTEXITCODE:` instead of `${LASTEXITCODE}` inside a throw string
+  - `tests/test_testing_scripts.py` still expected the old Wave 4 gaps to remain uncovered
+  - `src/evaluate_forecast.py` emitted a pandas deprecation warning from `DataFrame.applymap`
 - Blockers:
   - None active
 - Remaining risk:
-  - Wave 1 is complete, but direct coverage is still missing for `src/binance_market_data.py`, `src/bootstrap_postgres.py`, and the forecast/backtest surfaces
+  - Wave 4 is complete, but coverage is still unmeasured and legacy training-oriented surfaces remain lightly tested
+
+## Wave 3 Detail
+
+- Status: `complete`
+- Completed scopes:
+  - Scope A: improved Docker fixture diagnostics and marker hygiene in `tests/conftest.py`
+  - Scope B: added PostgreSQL ingest and summary contract coverage
+  - Scope C: added discovery, verify, and materialize CLI contract coverage
+- Commands run:
+  - `docker info`
+  - `node scripts/testing/classify-test-level.mjs --source tests/conftest.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/bootstrap_postgres.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/postgres_ingest_binance.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/postgres_discover_data.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/postgres_verify_data.py --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source src/postgres_materialize_dataset.py --markdown`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_postgres_cli_contracts.py tests/test_postgres_fixture_diagnostics.py -q`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_db_connection.py tests/test_schema_bootstrap.py tests/test_binance_ingest.py tests/test_discovery_cli.py tests/test_materialize_dataset.py tests/test_provenance.py -q -m "docker"`
+  - `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`
+  - `node scripts/precommit-checks.mjs`
+- Failures encountered:
+  - the first CLI contract draft for discovery did not match the real rendered table format
+  - the first fixture-diagnostics test used `stdout=` instead of `output=` for `CalledProcessError`
+- Blockers:
+  - None active
+- Remaining risk:
+  - Docker is still required for the PostgreSQL integration slice, but the suite is now smaller, better isolated, and easier to diagnose

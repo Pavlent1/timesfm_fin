@@ -201,8 +201,8 @@ def format_results(results: list[dict[str, float | int | str]]) -> pd.DataFrame:
         "step1_directional_accuracy",
         "end_directional_accuracy",
     ]
-    frame[numeric_columns] = frame[numeric_columns].applymap(
-        lambda value: round(float(value), 6)
+    frame[numeric_columns] = frame[numeric_columns].apply(
+        lambda column: column.map(lambda value: round(float(value), 6))
     )
     return frame.sort_values("series").reset_index(drop=True)
 

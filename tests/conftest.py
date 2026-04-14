@@ -31,13 +31,38 @@ DOCKER_FIXTURES = {
 
 
 def run_checked_command(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        list(args),
-        cwd=REPO_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    command = list(args)
+    try:
+        return subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        rendered = " ".join(command)
+        raise RuntimeError(
+            "Docker command failed while preparing PostgreSQL test fixtures. "
+            f"Missing executable for `{rendered}`. "
+            "Ensure Docker Desktop is installed and running before rerunning the Docker-marked pytest suite."
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        rendered = " ".join(command)
+        stdout = (exc.stdout or "").strip()
+        stderr = (exc.stderr or "").strip()
+        details = []
+        if stdout:
+            details.append(f"stdout: {stdout}")
+        if stderr:
+            details.append(f"stderr: {stderr}")
+        suffix = f" Details: {' | '.join(details)}" if details else ""
+        raise RuntimeError(
+            "Docker command failed while preparing PostgreSQL test fixtures. "
+            f"Command: `{rendered}` exited with code {exc.returncode}. "
+            "Ensure Docker Desktop is running and `docker compose up -d postgres` succeeds first."
+            f"{suffix}"
+        ) from exc
 
 
 @pytest.fixture(scope="session")
@@ -57,7 +82,10 @@ def repo_postgres_service():
             last_error = exc
             time.sleep(1.0)
 
-    raise RuntimeError("Compose-managed PostgreSQL never became ready.") from last_error
+    raise RuntimeError(
+        "Compose-managed PostgreSQL never became ready for the Docker-marked test suite. "
+        "Ensure Docker Desktop is running and `docker compose up -d postgres` succeeds before rerunning these tests."
+    ) from last_error
 
 
 @pytest.fixture()
@@ -185,14 +213,18 @@ def dataset_factory(bootstrapped_postgres_connection):
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         node_path = str(item.path).replace("\\", "/")
+        existing_markers = {marker.name for marker in item.iter_markers()}
 
         if any(fixture_name in item.fixturenames for fixture_name in DOCKER_FIXTURES):
             item.add_marker(pytest.mark.integration)
             item.add_marker(pytest.mark.docker)
             continue
 
-        if node_path.endswith("tests/test_docs_contract.py"):
+        if "contract" in existing_markers or node_path.endswith("tests/test_docs_contract.py"):
             item.add_marker(pytest.mark.contract)
+            continue
+
+        if {"unit", "integration", "docker"} & existing_markers:
             continue
 
         item.add_marker(pytest.mark.unit)
