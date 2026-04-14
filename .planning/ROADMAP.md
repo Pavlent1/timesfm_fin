@@ -35,13 +35,20 @@ Plans:
 
 ### Phase 2: Create backtest architecture, qualification rules, and statistics collection
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Replace the SQLite-only crypto backtest experiment store with a PostgreSQL-backed architecture that persists run, window, and per-step prediction facts and exposes queryable per-horizon statistics using the locked Phase 2 metric semantics.
+**Requirements**: [BT-01, BT-02, BT-03, BT-04, BT-05]
 **Depends on:** Phase 1
-**Plans:** 0 plans
+**Success Criteria** (what must be TRUE):
+  1. The backtest workflow writes canonical run, window, and per-step prediction facts to PostgreSQL through the shared repo connection path.
+  2. PostgreSQL exposes direct per-step aggregate statistics for normalized deviation and overshoot/undershoot behavior across a run.
+  3. Stored metrics and automated tests match the locked formulas and context-relative classification rules from Phase 2 context.
+  4. The CLI wrapper and repository docs describe the PostgreSQL-backed backtest flow and no longer present SQLite as the canonical store.
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 2 to break down)
+- [ ] 02-01-PLAN.md - Metric semantics contract and reusable backtest metric module
+- [ ] 02-02-PLAN.md - PostgreSQL backtest schema, bootstrap, and query helpers
+- [ ] 02-03-PLAN.md - Crypto backtest runtime migration, wrapper updates, and operator docs
 
 ## Progress
 
@@ -51,4 +58,4 @@ Phases execute in numeric order: 1 -> 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |
-| 2. Create backtest architecture, qualification rules, and statistics collection | 0/0 | Not planned | - |
+| 2. Create backtest architecture, qualification rules, and statistics collection | 0/3 | Planned | - |

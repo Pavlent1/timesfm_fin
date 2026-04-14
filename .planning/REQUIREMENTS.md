@@ -25,6 +25,14 @@
 
 ## v2 Requirements
 
+### Backtesting And Evaluation
+
+- **BT-01**: User can run the crypto minute backtest with PostgreSQL as the canonical store for backtest runs, windows, and per-step prediction facts.
+- **BT-02**: User can query per-output-candle backtest statistics directly from PostgreSQL so horizon-distance behavior is inspectable without manual recomputation.
+- **BT-03**: User can inspect overshoot and undershoot outcomes using the locked context-relative classification and signed percent deviation rules.
+- **BT-04**: User can reproduce a stored backtest result from recorded run metadata, model settings, and source data coverage.
+- **BT-05**: User can rely on automated tests to catch regressions in backtest metric semantics and PostgreSQL persistence.
+
 ### Modeling On Top Of PostgreSQL
 
 - **MODEL-01**: User can drive forecasting or evaluation workflows directly from PostgreSQL-backed datasets instead of ad hoc file inputs.
@@ -57,12 +65,17 @@
 | DISC-01 | Phase 1 | Satisfied |
 | DISC-02 | Phase 1 | Satisfied |
 | DISC-03 | Phase 1 | Satisfied |
+| BT-01 | Phase 2 | Planned |
+| BT-02 | Phase 2 | Planned |
+| BT-03 | Phase 2 | Planned |
+| BT-04 | Phase 2 | Planned |
+| BT-05 | Phase 2 | Planned |
 
 **Coverage:**
-- v1 requirements: 9 total
-- Mapped to phases: 9
+- v1 requirements: 14 total
+- Mapped to phases: 14
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-13*
-*Last updated: 2026-04-13 after Phase 1 verification*
+*Last updated: 2026-04-14 during Phase 2 planning*
