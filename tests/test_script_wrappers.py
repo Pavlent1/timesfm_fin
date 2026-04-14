@@ -97,6 +97,47 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
     assert "--db-path" not in logged_command
 
 
+def test_run_crypto_backtest_wrapper_defaults_to_cpu_backend(tmp_path) -> None:
+    powershell = find_powershell()
+    docker_cmd = tmp_path / "docker.cmd"
+    docker_log = tmp_path / "docker.log"
+    docker_cmd.write_text(
+        "@echo off\r\n"
+        f">> \"{docker_log}\" echo %*\r\n"
+        "exit /b 0\r\n",
+        encoding="ascii",
+    )
+
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path};{env['PATH']}"
+
+    subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(REPO_ROOT / "scripts" / "run_crypto_backtest.ps1"),
+            "-SkipBuild",
+            "-Day",
+            "2024-04-01",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+    logged_command = docker_log.read_text(encoding="utf-8").strip()
+
+    assert "--backend cpu" in logged_command
+    assert "--gpus all" not in logged_command
+    assert "--day 2024-04-01" in logged_command
+    assert "--mode live" not in logged_command
+
+
 def test_setup_windows_script_rejects_non_310_python(tmp_path) -> None:
     powershell = find_powershell()
     python_cmd = tmp_path / "python.cmd"

@@ -6,7 +6,7 @@ param(
     [int]$HorizonLen = 16,
     [int]$Stride = 1,
     [int]$BatchSize = 64,
-    [string]$Backend = "gpu",
+    [string]$Backend = "cpu",
     [string]$OutputCsv = "",
     [int]$Freq = 0,
     [Nullable[int]]$MaxWindows = $null,
