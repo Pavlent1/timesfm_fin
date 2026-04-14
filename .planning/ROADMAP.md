@@ -47,7 +47,7 @@ Plans:
 
 Plans:
 - [x] 02-01-PLAN.md - Metric semantics contract and reusable backtest metric module
-- [ ] 02-02-PLAN.md - PostgreSQL backtest schema, bootstrap, and query helpers
+- [x] 02-02-PLAN.md - PostgreSQL backtest schema, bootstrap, and query helpers
 - [ ] 02-03-PLAN.md - Crypto backtest runtime migration, wrapper updates, and operator docs
 
 ## Progress

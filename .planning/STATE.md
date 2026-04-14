@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-04-14T15:03:58.418Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-04-14T15:06:59.992Z"
 last_activity: 2026-04-14
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 86
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 ## Current Position
 
 Phase: 02 (create-backtest-architecture-qualification-rules-and-statist) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
-Last activity: 2026-04-14 -- Completed 02-01-PLAN.md
+Last activity: 2026-04-14
 
 Progress: [███████░░░] 71%
 
@@ -52,6 +52,7 @@ Progress: [███████░░░] 71%
 - Trend: Phase 2 execution is in progress with 1 of 3 plans complete
 
 | Phase 02 P01 | 8m | 2 tasks | 5 files |
+| Phase 02 P02 | 5m | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,8 @@ Recent decisions affecting current work:
 - [Phase 0]: Prioritize reproducibility, validation, and trust over new product surface.
 - [Phase 02]: Locked Phase 2 backtest metric semantics in src/backtest_metrics.py before persistence or runtime migration reuses them.
 - [Phase 02]: Phase 2 metric contract tests import the subject lazily so collect-only verification stays green before implementation exists.
+- [Phase 02]: Bootstrap now treats checked-in db/init SQL files as an ordered schema set applied lexically.
+- [Phase 02]: Backtest PostgreSQL helpers return generated IDs and keep transaction control with callers.
 
 ### Pending Todos
 
@@ -91,6 +94,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-14T15:03:58.413Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-04-14T15:06:59.987Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
