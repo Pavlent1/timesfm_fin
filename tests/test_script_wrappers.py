@@ -138,6 +138,14 @@ def test_run_crypto_backtest_wrapper_defaults_to_cpu_backend(tmp_path) -> None:
     assert "--mode live" not in logged_command
 
 
+def test_dockerfile_installs_shared_runtime_requirements_for_backtest() -> None:
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert "COPY requirements.inference.txt /workspace/requirements.inference.txt" in dockerfile
+    assert '"timesfm[pax]==1.3.0"' in dockerfile
+    assert "-r /workspace/requirements.inference.txt" in dockerfile
+
+
 def test_setup_windows_script_rejects_non_310_python(tmp_path) -> None:
     powershell = find_powershell()
     python_cmd = tmp_path / "python.cmd"
