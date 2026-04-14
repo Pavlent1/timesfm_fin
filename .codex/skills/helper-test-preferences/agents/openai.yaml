@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Test Preferences"
+  short_description: "Save or update reusable testing policy for the repo"
+  default_prompt: "Use $helper-test-preferences to learn or update this repo's testing policy in short Q/A rounds, resume from AgentHelper/ProjectFiles/TestAutomation/TEST_PREFERENCES.yaml when it exists, and save only material policy changes."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Improve Skill"
+  short_description: "Audit a skill and confirm improvement direction"
+  default_prompt: "Use $helper-improve-skill to follow a strict sequence for a target skill: first analysis, short user Q/A, second analysis for concrete problems, then a brief Top 5 or Top X improvements summary that either asks to apply minor edits immediately or offers a detailed improvement plan."

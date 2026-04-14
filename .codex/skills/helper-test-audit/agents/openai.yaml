@@ -1,0 +1,4 @@
+interface:
+  display_name: "Helper Test Audit"
+  short_description: "Audit existing tests and missing coverage across the repo"
+  default_prompt: "Use $helper-test-audit to audit the repository's current unit, integration, and E2E tests from real command output, record invalid or missing coverage in TEST_AUDIT.md, and refresh TEST_BASELINE.md plus TEST_INVENTORY.md."

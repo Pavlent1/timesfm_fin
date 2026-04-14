@@ -1,15 +1,16 @@
 version: 1
 status:
-  overall: draft
-  confirmation_state: partially_confirmed
+  overall: actionable
+  confirmation_state: conservative_defaults_applied
   user_input_mode: defaults_requested
 created_at: "2026-04-13T21:16:13Z"
-updated_at: "2026-04-13T21:21:24Z"
+updated_at: "2026-04-13T21:43:00Z"
 sources:
   skill: helper-test-preferences
   discovery_method: manual_repo_inspection
   notes:
     - Required discovery script `scripts/testing/discover-test-landscape.mjs` was not present in the repository, so runner detection came from direct repo inspection.
+    - A root-level `discover-test-landscape.mjs` was later added on 2026-04-13, but it is not yet runnable for this workflow because the required path is `scripts/testing/discover-test-landscape.mjs` and the script currently imports a missing `./_shared.mjs`.
 repo_snapshot:
   captured_at: "2026-04-13T21:16:13Z"
   detected_runners:
