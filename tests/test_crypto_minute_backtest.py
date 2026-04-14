@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import json
-import sqlite3
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -23,9 +21,48 @@ class PerfectBacktestModel:
 
 def sample_binance_rows() -> list[list]:
     return [
-        [1711929600000, "70000.0", "70100.0", "69950.0", "70010.0", "1.2", 1711929659999, "0", 10, "0", "0", "0"],
-        [1711929660000, "70010.0", "70120.0", "70000.0", "70050.0", "1.3", 1711929719999, "0", 11, "0", "0", "0"],
-        [1711929720000, "70050.0", "70130.0", "70040.0", "70090.0", "1.1", 1711929779999, "0", 9, "0", "0", "0"],
+        [
+            1711929600000,
+            "70000.0",
+            "70100.0",
+            "69950.0",
+            "70010.0",
+            "1.2",
+            1711929659999,
+            "0",
+            10,
+            "0",
+            "0",
+            "0",
+        ],
+        [
+            1711929660000,
+            "70010.0",
+            "70120.0",
+            "70000.0",
+            "70050.0",
+            "1.3",
+            1711929719999,
+            "0",
+            11,
+            "0",
+            "0",
+            "0",
+        ],
+        [
+            1711929720000,
+            "70050.0",
+            "70130.0",
+            "70040.0",
+            "70090.0",
+            "1.1",
+            1711929779999,
+            "0",
+            9,
+            "0",
+            "0",
+            "0",
+        ],
     ]
 
 
@@ -43,29 +80,56 @@ def build_backtest_frame() -> pd.DataFrame:
     )
 
 
-def test_store_and_load_candles_round_trip() -> None:
-    conn = sqlite3.connect(":memory:")
-    crypto_minute_backtest.ensure_schema(conn)
-
-    with conn:
-        inserted = crypto_minute_backtest.store_candles(
-            conn,
-            exchange="binance",
-            symbol="BTCUSDT",
-            interval="1m",
-            rows=sample_binance_rows(),
-        )
-
-    frame = crypto_minute_backtest.load_candles(
-        conn,
-        exchange="binance",
+def seed_phase1_rows(conn, dataset_factory) -> None:
+    series_id = dataset_factory.ensure_series(
         symbol="BTCUSDT",
-        interval="1m",
-        start_ms=1711929600000,
-        end_ms=1711929780000,
+        source_name="binance",
+        timeframe="1m",
+    )
+    ingestion_run_id = dataset_factory.create_ingestion_run(
+        series_id=series_id,
+        requested_start_utc=datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc),
+        requested_end_utc=datetime(2024, 4, 1, 0, 3, tzinfo=timezone.utc),
+        rows_written=3,
+        status="completed",
+    )
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO market_data.observations (
+                series_id,
+                observation_time_utc,
+                close_price,
+                ingestion_run_id
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            [
+                (
+                    series_id,
+                    datetime(2024, 4, 1, 0, minute, tzinfo=timezone.utc),
+                    close_price,
+                    ingestion_run_id,
+                )
+                for minute, close_price in enumerate([70010.0, 70050.0, 70090.0])
+            ],
+        )
+    conn.commit()
+
+
+def test_load_backtest_frame_reads_requested_day_from_phase1_postgres(
+    bootstrapped_postgres_connection,
+    dataset_factory,
+) -> None:
+    conn = bootstrapped_postgres_connection
+    seed_phase1_rows(conn, dataset_factory)
+
+    frame = crypto_minute_backtest.load_backtest_frame(
+        conn=conn,
+        symbol="BTCUSDT",
+        target_day=date(2024, 4, 1),
     )
 
-    assert inserted == 3
     assert frame["close"].tolist() == [70010.0, 70050.0, 70090.0]
     assert frame["open_time_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist() == [
         "2024-04-01T00:00:00Z",
@@ -74,9 +138,11 @@ def test_store_and_load_candles_round_trip() -> None:
     ]
 
 
-def test_prepare_live_frame_fetches_rows_and_keeps_requested_context(monkeypatch) -> None:
-    conn = sqlite3.connect(":memory:")
-    crypto_minute_backtest.ensure_schema(conn)
+def test_prepare_live_frame_persists_fetched_rows_into_postgres(
+    bootstrapped_postgres_connection,
+    monkeypatch,
+) -> None:
+    conn = bootstrapped_postgres_connection
     start_dt = datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc)
     end_dt = datetime(2024, 4, 1, 0, 3, tzinfo=timezone.utc)
     observed: dict[str, object] = {}
@@ -107,6 +173,19 @@ def test_prepare_live_frame_fetches_rows_and_keeps_requested_context(monkeypatch
         context_len=3,
     )
 
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) FROM market_data.observations")
+        observation_count = cur.fetchone()[0]
+        cur.execute(
+            """
+            SELECT status, rows_written
+            FROM market_data.ingestion_runs
+            ORDER BY ingestion_run_id DESC
+            LIMIT 1
+            """
+        )
+        ingestion_row = cur.fetchone()
+
     assert observed["fetch"] == {
         "symbol": "BTCUSDT",
         "start_ms": int(start_dt.timestamp() * 1000),
@@ -116,10 +195,12 @@ def test_prepare_live_frame_fetches_rows_and_keeps_requested_context(monkeypatch
     assert loaded_start == start_dt
     assert loaded_end == end_dt
     assert frame["close"].tolist() == [70010.0, 70050.0, 70090.0]
+    assert observation_count == 3
+    assert ingestion_row == ("completed", 3)
 
 
-def test_run_backtest_returns_metrics_and_prediction_rows() -> None:
-    metrics, prediction_rows = crypto_minute_backtest.run_backtest(
+def test_run_backtest_returns_metrics_and_window_step_records() -> None:
+    metrics, window_rows = crypto_minute_backtest.run_backtest(
         model=PerfectBacktestModel(),
         frame=build_backtest_frame(),
         context_len=4,
@@ -137,9 +218,26 @@ def test_run_backtest_returns_metrics_and_prediction_rows() -> None:
     assert metrics["hit_rate"] == 1.0
     assert metrics["step1_directional_accuracy"] == 1.0
     assert metrics["end_directional_accuracy"] == 1.0
-    assert len(prediction_rows) == 3
-    assert prediction_rows[0][4] == 5.0
-    assert json.loads(prediction_rows[0][12]) == [5.0, 6.0]
+    assert len(window_rows) == 3
+
+    first_window = window_rows[0]
+    assert first_window["window_index"] == 0
+    assert first_window["last_input_close"] == 4.0
+    assert first_window["target_start_utc"] == pd.Timestamp("2024-04-01T00:04:00Z")
+    assert len(first_window["steps"]) == 2
+    assert first_window["steps"][0] == {
+        "step_index": 0,
+        "target_time_utc": pd.Timestamp("2024-04-01T00:04:00Z"),
+        "last_input_close": 4.0,
+        "predicted_close": 5.0,
+        "actual_close": 5.0,
+        "normalized_deviation_pct": 0.0,
+        "signed_deviation_pct": 0.0,
+        "overshoot_label": "match",
+    }
+    assert first_window["steps"][1]["target_time_utc"] == pd.Timestamp(
+        "2024-04-01T00:05:00Z"
+    )
 
 
 def test_run_live_forecast_returns_forecast_table() -> None:
@@ -168,11 +266,12 @@ def test_run_live_forecast_returns_forecast_table() -> None:
     assert forecast_df["predicted_return_pct"].tolist() == pytest.approx([1.0, 2.0])
 
 
-def test_save_backtest_persists_run_and_predictions() -> None:
-    conn = sqlite3.connect(":memory:")
-    crypto_minute_backtest.ensure_schema(conn)
+def test_save_backtest_writes_run_window_and_step_rows(
+    bootstrapped_postgres_connection,
+) -> None:
+    conn = bootstrapped_postgres_connection
     frame = build_backtest_frame()
-    metrics, prediction_rows = crypto_minute_backtest.run_backtest(
+    metrics, window_rows = crypto_minute_backtest.run_backtest(
         model=PerfectBacktestModel(),
         frame=frame,
         context_len=4,
@@ -193,24 +292,63 @@ def test_save_backtest_persists_run_and_predictions() -> None:
         batch_size=2,
     )
 
-    with conn:
-        run_id = crypto_minute_backtest.save_backtest(
-            conn=conn,
-            args=args,
-            start_dt=frame["open_time_utc"].iloc[0].to_pydatetime(),
-            end_dt=frame["open_time_utc"].iloc[-1].to_pydatetime(),
-            metrics=metrics,
-            prediction_rows=prediction_rows,
+    run_id = crypto_minute_backtest.save_backtest(
+        conn=conn,
+        args=args,
+        start_dt=frame["open_time_utc"].iloc[0].to_pydatetime(),
+        end_dt=frame["open_time_utc"].iloc[-1].to_pydatetime(),
+        metrics=metrics,
+        window_rows=window_rows,
+    )
+    conn.commit()
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT symbol, model_repo_id, backend, points, windows
+            FROM market_data.backtest_runs
+            WHERE run_id = %s
+            """,
+            (run_id,),
         )
+        stored_run = cur.fetchone()
+        cur.execute(
+            """
+            SELECT window_index, target_start_utc, context_end_utc, last_input_close
+            FROM market_data.backtest_windows
+            WHERE run_id = %s
+            ORDER BY window_index
+            """,
+            (run_id,),
+        )
+        stored_windows = cur.fetchall()
+        cur.execute(
+            """
+            SELECT
+                step_index,
+                predicted_close,
+                actual_close,
+                normalized_deviation_pct,
+                signed_deviation_pct,
+                overshoot_label
+            FROM market_data.backtest_prediction_steps
+            WHERE run_id = %s
+            ORDER BY window_id, step_index
+            """,
+            (run_id,),
+        )
+        stored_steps = cur.fetchall()
 
-    stored_run = conn.execute(
-        "SELECT symbol, windows, mae, hit_rate FROM backtest_runs WHERE run_id = ?",
-        (run_id,),
-    ).fetchone()
-    stored_predictions = conn.execute(
-        "SELECT COUNT(*) FROM backtest_predictions WHERE run_id = ?",
-        (run_id,),
-    ).fetchone()[0]
-
-    assert stored_run == ("BTCUSDT", 1, 0.0, 1.0)
-    assert stored_predictions == 1
+    assert stored_run == ("BTCUSDT", "stub/repo", "cpu", 10, 1)
+    assert stored_windows == [
+        (
+            0,
+            datetime(2024, 4, 1, 0, 4, tzinfo=timezone.utc),
+            datetime(2024, 4, 1, 0, 3, tzinfo=timezone.utc),
+            4.0,
+        )
+    ]
+    assert stored_steps == [
+        (0, 5.0, 5.0, 0.0, 0.0, "match"),
+        (1, 6.0, 6.0, 0.0, 0.0, "match"),
+    ]

@@ -22,8 +22,18 @@ def test_readme_and_db_readme_document_phase1_postgres_workflow() -> None:
     for snippet in required_snippets:
         assert snippet in readme
 
+    assert "Crypto minute backtest with PostgreSQL" in readme
+    assert "host.docker.internal" in readme
+    assert "backtest_step_stats_vw" in readme
+    assert "outputs/crypto_backtest.sqlite" not in readme
+
+    assert "market_data.backtest_runs" in db_readme
+    assert "market_data.backtest_windows" in db_readme
+    assert "market_data.backtest_prediction_steps" in db_readme
+    assert "market_data.backtest_step_stats_vw" in db_readme
     assert "market_data.assets" in db_readme
     assert "market_data.series" in db_readme
     assert "market_data.ingestion_runs" in db_readme
     assert "market_data.observations" in db_readme
     assert "local development trust boundary" in db_readme
+    assert "SQLite" not in db_readme

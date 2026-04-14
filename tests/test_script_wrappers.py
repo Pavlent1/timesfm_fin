@@ -63,8 +63,6 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
             "2",
             "-MaxWindows",
             "5",
-            "-DbPath",
-            "/workspace/out.sqlite",
             "-OutputCsv",
             "/workspace/live.csv",
         ],
@@ -79,6 +77,9 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
 
     assert "Running crypto minute backtest" in result.stdout
     assert "run --rm --gpus all" in logged_command
+    assert "--add-host host.docker.internal:host-gateway" in logged_command
+    assert "-e POSTGRES_HOST=host.docker.internal" in logged_command
+    assert "-e POSTGRES_PORT=54329" in logged_command
     assert f"-v {REPO_ROOT}:/workspace" in logged_command
     assert "--entrypoint python" in logged_command
     assert "src/crypto_minute_backtest.py" in logged_command
@@ -93,6 +94,7 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
     assert "--max-windows 5" in logged_command
     assert "--mode live" in logged_command
     assert "--output-csv /workspace/live.csv" in logged_command
+    assert "--db-path" not in logged_command
 
 
 def test_setup_windows_script_rejects_non_310_python(tmp_path) -> None:
