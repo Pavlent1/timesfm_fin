@@ -1,9 +1,9 @@
 # Test Audit
 
-- Date: 2026-04-13
+- Date: 2026-04-14
 - Scope: whole approved codebase (`src/`, `configs/`, `scripts/`)
 - Audit mode: repo inspection plus real command execution
-- Preferences status: `AgentHelper/ProjectFiles/TestAutomation/TEST_PREFERENCES.yaml` is still `draft`, so the audit used conservative defaults
+- Preferences status: `AgentHelper/ProjectFiles/TestAutomation/TEST_PREFERENCES.yaml` is `actionable` with conservative defaults still in effect for unresolved CI and threshold decisions
 
 ## Commands Run
 
@@ -11,90 +11,83 @@
 - `node scripts/testing/measure-coverage.mjs --markdown`
 - `node scripts/testing/summarize-test-gaps.mjs --markdown`
 - `node scripts/precommit-checks.mjs`
-- `python -m pytest --collect-only -q`
-- `python -m pytest tests/test_docs_contract.py -q`
-- `.\.venv\Scripts\python.exe -m pytest --version`
 - `.\.venv\Scripts\python.exe -m pytest --collect-only -q`
-- `.\.venv\Scripts\python.exe -m pytest tests/test_docs_contract.py -q`
-- `.\.venv\Scripts\python.exe -m pytest -q`
+- `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`
 
 ## Severity-Ordered Findings
 
-### 1. Broken Or Non-Functional Test Execution: most of the suite is currently blocked by shared Docker startup
+### 1. Missing Coverage Measurement: the repo now has a coverage command, but coverage is still unavailable
 
 - Evidence:
-  - `.\.venv\Scripts\python.exe -m pytest -q` collected 12 tests but ended with `2 passed, 10 errors`
-  - every failing test died in the shared session fixture in `tests/conftest.py:35-52`
-  - the failure occurs before assertions run because `docker compose up -d postgres` cannot reach Docker on this machine
-  - the repo-managed gate in `scripts/precommit-checks.mjs:83-103` also exits before running pytest when Docker is unavailable
-- Classification: broken or non-functional test execution
+  - `node scripts/testing/measure-coverage.mjs --markdown` passed
+  - the script reported coverage status `unavailable`
+  - the current reason is that `pytest-cov` is not installed in the repo-managed Python environment
+- Classification: missing coverage measurement
 - Impact:
-  - most test signal is unavailable in environments where Docker is not ready
-  - one infrastructure failure masks all database-backed behavior, so application regressions are indistinguishable from environment outages
+  - Wave 1 fixed the missing-command failure mode, but the repository still cannot quantify coverage deltas
+  - later audit and planning work still need to treat coverage as advisory-unavailable instead of measured
 
-### 2. Missing Runnable Audit Tooling: required discovery, coverage, and gap scripts do not exist
-
-- Evidence:
-  - `node scripts/testing/discover-test-landscape.mjs --markdown` failed with `MODULE_NOT_FOUND`
-  - `node scripts/testing/measure-coverage.mjs --markdown` failed with `MODULE_NOT_FOUND`
-  - `node scripts/testing/summarize-test-gaps.mjs --markdown` failed with `MODULE_NOT_FOUND`
-- Classification: missing runnable command and missing coverage measurement
-- Impact:
-  - there is no repo-owned automated way to inventory the test landscape, measure coverage, or summarize hotspots
-  - future planning work must start from manual inspection instead of durable automation
-
-### 3. Fragile Layering: almost all existing tests are integration tests gated by the same Docker-backed fixture
+### 2. Fragile Layer Balance Remains: most integration signal still sits behind the same Docker-backed fixture
 
 - Evidence:
-  - 10 of 12 collected tests require the `repo_postgres_service` fixture in `tests/conftest.py:35-52`
-  - the only isolated passing tests during this audit were `test_load_postgres_settings_uses_repo_defaults` and `test_readme_and_db_readme_document_phase1_postgres_workflow`
+  - `.\.venv\Scripts\python.exe -m pytest --collect-only -q` collected 17 tests
+  - `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"` passed with `7 passed, 10 deselected`
+  - the remaining 10 tests are still concentrated in the PostgreSQL fixture stack rooted in `tests/conftest.py`
 - Classification: fragile pattern and incorrect layer balance
 - Impact:
-  - pure logic inside the PostgreSQL data pipeline has very little protection when Docker is unavailable
-  - a single environment dependency turns the suite into an all-or-nothing check instead of a layered safety net
+  - the new non-Docker subset restores fast reusable feedback, which resolves the original Wave 1 blocker
+  - however, most application-behavior coverage still depends on Docker-backed PostgreSQL setup and can fail as a group when that environment is unavailable
 
-### 4. Important Shared Adapters And CLIs Have No Direct Tests
-
-- Evidence:
-  - `src/binance_market_data.py:25-78` contains pagination, de-duplication, stalled-cursor protection, and HTTP 429 retry logic with no direct automated tests detected
-  - `src/bootstrap_postgres.py:16-78` contains CLI parsing, readiness waiting, and schema application flow with no direct automated tests detected
-- Classification: missing tests for important behavior
-- Impact:
-  - failures in shared network-fetch logic would likely surface late through larger workflows
-  - bootstrap CLI regressions can slip through even though the Postgres path is currently a major focus of the tested area
-
-### 5. Core Forecasting, Backtesting, And Training Surfaces Remain Untested
+### 3. Important Shared Adapters And CLIs Still Have No Direct Tests
 
 - Evidence:
-  - no direct tests were found for `src/run_forecast.py`, `src/evaluate_forecast.py`, `src/crypto_minute_backtest.py`, `src/main.py`, `src/train.py`, `src/evaluation.py`, `src/train_flax.py`, `src/mock_trading.py`, `src/mock_trading_utils.py`, `configs/fine_tuning.py`, `scripts/setup_windows.ps1`, or `scripts/run_crypto_backtest.ps1`
+  - `node scripts/testing/summarize-test-gaps.mjs --markdown` lists `src/binance_market_data.py` and `src/bootstrap_postgres.py` among the direct-coverage gaps
+  - the current inventory still finds no dedicated tests for those files
 - Classification: missing tests for important behavior
 - Impact:
-  - the current suite validates only the new PostgreSQL data-layer slice plus docs text presence
-  - the repo's published CLI-first value proposition is still largely outside automated coverage
+  - failures in shared market-data fetch logic or the bootstrap CLI can still surface late through larger workflows
+  - these remain the next high-value targets after the Wave 1 groundwork
+
+### 4. Core Forecasting, Backtesting, And Legacy Training Surfaces Remain Untested
+
+- Evidence:
+  - the refreshed inventory still shows no direct tests for `src/run_forecast.py`, `src/evaluate_forecast.py`, `src/crypto_minute_backtest.py`, `src/main.py`, `src/train.py`, `src/evaluation.py`, `src/train_flax.py`, `src/mock_trading.py`, `src/mock_trading_utils.py`, `configs/fine_tuning.py`, `scripts/setup_windows.ps1`, or `scripts/run_crypto_backtest.ps1`
+- Classification: missing tests for important behavior
+- Impact:
+  - the repository's published forecasting and backtesting workflows still sit outside automated coverage
+  - the current suite remains strongest around the PostgreSQL data pipeline plus the new Wave 1 tooling scripts
+
+## Wave 1 Resolution Notes
+
+- The previously missing `scripts/testing/` helper commands now exist and run from the repo root.
+- The repository now registers `unit`, `contract`, `integration`, and `docker` markers through `pytest.ini`.
+- The always-runnable subset is now explicit and verified with `pytest -m "not docker"`.
+- In the current Docker-ready environment, `node scripts/precommit-checks.mjs` and the full pytest suite both pass.
 
 ## Suite Health By Area
 
 | Area | Layer | Health | Notes |
 | --- | --- | --- | --- |
-| PostgreSQL defaults | Unit | Pass | One isolated default-settings test runs without Docker |
-| PostgreSQL schema / ingest / provenance / discovery / integrity / materialization | Integration | Blocked | 10 tests collect but fail at Docker-backed setup before assertions |
-| Documentation contract | Contract | Pass | Presence-only check for README snippets and DB table names |
+| Test discovery and gap-reporting helper scripts | Tooling | Pass | `scripts/testing/` commands now exist and run successfully |
+| Always-runnable non-Docker subset | Unit + contract | Pass | `7 passed, 10 deselected` |
+| PostgreSQL schema / ingest / provenance / discovery / integrity / materialization | Integration (`docker`) | Pass in current environment | Still concentrated behind one Docker-backed fixture |
+| Documentation contract | Contract | Pass | Lightweight drift check only; not runtime coverage |
+| Coverage measurement | Tooling | Unavailable | Command now exists, but the plugin is not installed |
 | CLI workflow / end-to-end coverage | E2E | Absent | No CLI smoke or end-to-end suite detected |
-| Coverage measurement | Tooling | Unavailable | No runnable repo-owned coverage script |
 
 ## Validity Notes On Existing Tests
 
-- `tests/test_docs_contract.py` is a valid lightweight contract test for documentation drift, but it should not be treated as runtime coverage for the referenced commands.
-- The PostgreSQL integration tests appear structurally aligned with the current Phase 1 data layer and exercise meaningful behaviors once the database is available.
-- Because the database suite could not get past environment setup in this audit run, assertion validity beyond collection-time inspection remains only partially verified.
+- `tests/test_docs_contract.py` remains a valid lightweight contract test for documentation drift, but it should not be treated as runtime coverage for the referenced commands.
+- The PostgreSQL integration tests still appear structurally aligned with the current Phase 1 data layer and now pass in a Docker-ready environment.
+- `tests/test_testing_scripts.py` gives the Wave 1 helper commands direct regression protection without introducing a second test runner.
 
 ## Missing-Test Areas
 
 ### Missing Unit Coverage
 
 - `src/binance_market_data.py` for pagination, retry, malformed-response handling, and stalled cursor behavior
-- `src/bootstrap_postgres.py` for argument parsing and `--skip-wait` behavior
-- metric and helper-heavy legacy code in `src/evaluate_forecast.py`, `src/utils.py`, and `src/crypto_minute_backtest.py`
+- `src/bootstrap_postgres.py` for argument parsing, readiness waiting, and `--skip-wait` behavior
+- helper and metric-heavy logic in `src/evaluate_forecast.py`, `src/utils.py`, and `src/crypto_minute_backtest.py`
 
 ### Missing Integration Coverage
 
@@ -114,15 +107,14 @@
 
 ## Blockers, Assumptions, And Unavailable Tooling
 
-- This audit was run on 2026-04-13 from a Windows orchestration environment where Docker Desktop was not available.
-- The repository's own docs position Linux, WSL, or Docker as the supported runtime for major flows, so the Docker dependency itself is not surprising; the lack of a smaller always-runnable subset is still a quality gap.
-- The `.venv` environment is usable and contains `pytest 9.0.3`; the system Python does not.
-- No committed test automation for discovery, coverage, or gap summarization was available under `scripts/testing/`.
+- This audit was run on 2026-04-14 from the repository root in a Windows environment where Docker was reachable.
+- The repository's own docs still position Linux, WSL, or Docker as the supported runtime for major flows, so Docker-backed integration is expected for part of the suite.
+- The `.venv` environment remains the working Python test environment; the system Python is still not the primary validated path for these workflows.
+- Coverage measurement remains intentionally unavailable until the project chooses a supported in-repo coverage mechanism.
 
 ## Prioritized Recommendations
 
-1. Add a Docker-independent pytest subset or marker strategy so pure/default/contract tests always run even when PostgreSQL infrastructure is unavailable.
-2. Restore or create the missing `scripts/testing/` audit helpers, or replace them with committed equivalents referenced by the helper workflow.
-3. Add direct unit tests for `src/binance_market_data.py` and `src/bootstrap_postgres.py`.
-4. Introduce CLI smoke tests for the documented PostgreSQL workflow and the main forecast/backtest entrypoints.
-5. Decide whether coverage measurement should exist in-repo; if yes, add one committed command and record its expected environment.
+1. Execute Wave 2 next to add direct tests for `src/binance_market_data.py` and `src/bootstrap_postgres.py`.
+2. Decide whether the project wants a committed coverage plugin or another supported measurement command, then update `scripts/testing/measure-coverage.mjs` accordingly.
+3. Continue reducing Docker concentration by adding more deterministic unit and contract tests around shared helpers and CLI boundaries.
+4. Add CLI smoke or contract coverage for the documented forecast and backtest entrypoints once the Wave 2 adapter work is complete.

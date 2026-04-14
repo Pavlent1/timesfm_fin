@@ -1,48 +1,44 @@
 # Test Baseline
 
-- Date: 2026-04-13
+- Date: 2026-04-14
 - Scope: whole approved codebase (`src/`, `configs/`, `scripts/`) plus the current `tests/` tree
-- Preferences file: `TEST_PREFERENCES.yaml` exists but is still `draft`, so it was treated as advisory only
+- Preferences file: `TEST_PREFERENCES.yaml` is `actionable` with conservative defaults still open for CI thresholds and later policy refinements
 
 ## Runners Detected
 
 | Runner | Version / status | Notes |
 | --- | --- | --- |
-| `pytest` | `9.0.3` from `.\.venv\Scripts\python.exe` | The repo-local virtual environment is the only verified runnable pytest environment |
-| Node.js helper scripts | Present | `scripts/precommit-checks.mjs` exists and is the repo-managed pre-commit test gate |
+| `pytest` | `9.0.3` from `.\.venv\Scripts\python.exe` | The repo-local virtual environment remains the verified runnable pytest environment |
+| Node.js helper scripts | Present under `scripts/testing/` | Discovery, coverage-status, gap-summary, affected-test, and classification commands now exist |
 | Browser / E2E runner | Not detected | No Playwright, Cypress, Jest, Vitest, or browser app surface detected |
 
 ## Commands Run
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `node scripts/testing/discover-test-landscape.mjs --markdown` | Failed | `MODULE_NOT_FOUND`; script is absent |
-| `node scripts/testing/measure-coverage.mjs --markdown` | Failed | `MODULE_NOT_FOUND`; script is absent |
-| `node scripts/testing/summarize-test-gaps.mjs --markdown` | Failed | `MODULE_NOT_FOUND`; script is absent |
-| `node scripts/precommit-checks.mjs` | Failed | Docker check failed before pytest started |
-| `python -m pytest --collect-only -q` | Failed | System Python does not have `pytest` installed |
-| `python -m pytest tests/test_docs_contract.py -q` | Failed | System Python does not have `pytest` installed |
-| `.\.venv\Scripts\python.exe -m pytest --version` | Passed | Reported `pytest 9.0.3` |
-| `.\.venv\Scripts\python.exe -m pytest --collect-only -q` | Passed | Collected 12 tests |
-| `.\.venv\Scripts\python.exe -m pytest tests/test_docs_contract.py -q` | Passed | `1 passed in 0.01s` |
-| `.\.venv\Scripts\python.exe -m pytest -q` | Failed | `2 passed, 10 errors in 1.40s`; all errors came from Docker-backed PostgreSQL setup |
+| `node scripts/testing/discover-test-landscape.mjs --markdown` | Passed | Reported 17 collected pytest tests plus the new registered markers |
+| `node scripts/testing/measure-coverage.mjs --markdown` | Passed | Coverage is explicitly unavailable because `pytest-cov` is not installed |
+| `node scripts/testing/summarize-test-gaps.mjs --markdown` | Passed | Highlighted Docker-heavy integration concentration and direct-coverage gaps |
+| `node scripts/precommit-checks.mjs` | Passed | Docker was reachable and the full pytest suite passed |
+| `.\.venv\Scripts\python.exe -m pytest --collect-only -q` | Passed | Collected 17 tests |
+| `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"` | Passed | `7 passed, 10 deselected in 5.61s` |
 
 ## Collection Snapshot
 
-- Total collected tests: 12
-- Passing without Docker: 2
-- Failing in full-suite execution: 10
-- Dominant failure mode: `docker compose up -d postgres` from `tests/conftest.py` could not connect to the Docker Desktop Linux engine on this Windows machine
+- Total collected tests: 17
+- Always-runnable non-Docker subset: 7
+- Docker-marked integration tests: 10
+- Dominant structure: one Docker-backed PostgreSQL fixture still underpins most integration tests, but the repo now has a stable non-Docker subset and tooling commands for audit workflows
 
 ## Coverage
 
 - Coverage status: unavailable
 - Reason:
-  - `scripts/testing/measure-coverage.mjs` is missing
-  - no repo-owned coverage command or committed coverage configuration was detected during this audit
+  - `scripts/testing/measure-coverage.mjs` now runs successfully but reports that `pytest-cov` is not installed in the repo-managed Python environment
+  - no other repo-owned coverage command or committed coverage configuration was detected during this audit refresh
 
 ## Blockers And Unavailable Areas
 
-- Docker was unavailable during the audit, so the PostgreSQL-backed integration suite could not run to assertion completion.
-- The required helper scripts under `scripts/testing/` are missing, so automated discovery, coverage measurement, and gap summarization are not currently runnable.
-- The system Python at `C:\Users\Pavel\AppData\Local\Programs\Python\Python310\python.exe` does not include `pytest`; the repo-local `.venv` must be used instead.
+- Ten current tests still require Docker-managed PostgreSQL and are selected through the new `docker` marker.
+- Coverage measurement is still unavailable until the repository decides to add a supported coverage plugin or alternative command.
+- No dedicated browser or end-to-end runner is configured, which is consistent with the current CLI-only repository shape but still leaves workflow-smoke coverage absent.
