@@ -4,6 +4,9 @@ import math
 from datetime import datetime
 from importlib import import_module
 
+import psycopg
+import pytest
+
 from postgres_dataset import bootstrap_schema, connect_postgres
 
 
@@ -239,3 +242,60 @@ def test_backtest_step_stats_view_exposes_grouped_stats_for_one_run(
     assert step_one["overshoot_count"] == 1
     assert step_one["undershoot_count"] == 1
     assert math.isclose(step_one["avg_signed_deviation_pct"], -1.0)
+
+
+def test_insert_backtest_steps_rejects_window_ids_from_another_run(
+    bootstrapped_postgres_connection,
+) -> None:
+    conn = bootstrapped_postgres_connection
+    run_id, _, _ = create_sample_run(conn)
+    postgres_backtest = load_postgres_backtest_module()
+    window_c_id = postgres_backtest.create_backtest_window(
+        conn=conn,
+        run_id=run_id,
+        window_index=2,
+        target_start_utc=utc("2024-04-01T00:06:00Z"),
+        context_end_utc=utc("2024-04-01T00:05:00Z"),
+        last_input_close=100.0,
+    )
+    other_run_id = postgres_backtest.create_backtest_run(
+        conn=conn,
+        exchange="binance",
+        symbol="ETHUSDT",
+        interval="1m",
+        model_repo_id="google/timesfm-1.0-200m",
+        backend="cpu",
+        freq_bucket=0,
+        context_len=4,
+        horizon_len=2,
+        stride=1,
+        batch_size=2,
+        data_start_utc=utc("2024-04-01T00:00:00Z"),
+        data_end_utc=utc("2024-04-01T00:05:00Z"),
+        points=6,
+        windows=1,
+    )
+    conn.commit()
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation) as exc_info:
+        postgres_backtest.insert_backtest_steps(
+            conn=conn,
+            rows=build_step_rows(
+                other_run_id,
+                window_c_id,
+                last_input_close=100.0,
+                step_specs=[
+                    {
+                        "target_time_utc": utc("2024-04-01T00:07:00Z"),
+                        "predicted_close": 101.0,
+                        "actual_close": 100.0,
+                        "normalized_deviation_pct": 1.0,
+                        "signed_deviation_pct": 1.0,
+                        "overshoot_label": "overshoot",
+                    }
+                ],
+            ),
+        )
+
+    assert exc_info.value.diag.constraint_name == "backtest_steps_run_window_fk"
+    conn.rollback()

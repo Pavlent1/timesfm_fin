@@ -25,12 +25,13 @@ CREATE TABLE IF NOT EXISTS market_data.backtest_windows (
     context_end_utc TIMESTAMPTZ NOT NULL,
     last_input_close DOUBLE PRECISION NOT NULL,
     created_at_utc TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT backtest_windows_run_window_unique UNIQUE (run_id, window_id),
     UNIQUE (run_id, window_index)
 );
 
 CREATE TABLE IF NOT EXISTS market_data.backtest_prediction_steps (
     run_id BIGINT NOT NULL REFERENCES market_data.backtest_runs (run_id) ON DELETE CASCADE,
-    window_id BIGINT NOT NULL REFERENCES market_data.backtest_windows (window_id) ON DELETE CASCADE,
+    window_id BIGINT NOT NULL,
     step_index INTEGER NOT NULL CHECK (step_index >= 0),
     target_time_utc TIMESTAMPTZ NOT NULL,
     last_input_close DOUBLE PRECISION NOT NULL,
@@ -40,7 +41,11 @@ CREATE TABLE IF NOT EXISTS market_data.backtest_prediction_steps (
     signed_deviation_pct DOUBLE PRECISION NOT NULL,
     overshoot_label TEXT NOT NULL CHECK (overshoot_label IN ('overshoot', 'undershoot', 'match')),
     created_at_utc TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (window_id, step_index)
+    PRIMARY KEY (window_id, step_index),
+    CONSTRAINT backtest_steps_run_window_fk
+        FOREIGN KEY (run_id, window_id)
+        REFERENCES market_data.backtest_windows (run_id, window_id)
+        ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_backtest_windows_run_id
