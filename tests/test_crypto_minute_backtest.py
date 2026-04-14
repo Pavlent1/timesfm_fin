@@ -437,3 +437,57 @@ def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> No
     assert observed["start_dt"] == datetime(2024, 4, 1, 12, 0, tzinfo=timezone.utc)
     assert observed["end_dt"] == datetime(2024, 4, 1, 12, 6, tzinfo=timezone.utc)
     assert observed["committed"] is True
+
+
+def test_print_summary_uses_human_readable_metric_labels(capsys) -> None:
+    args = argparse.Namespace(
+        day=date(2024, 4, 1),
+        symbol="BTCUSDT",
+        host="127.0.0.1",
+        port=54329,
+        db_name="timesfm_fin",
+    )
+    metrics = {
+        "windows": 1,
+        "mae": 33.574140625001746,
+        "rmse": 38.27004199860898,
+        "mape_pct": 0.047196569994895646,
+        "smape_pct": 0.0471868454945735,
+        "step1_directional_accuracy": 1.0,
+        "end_directional_accuracy": 0.0,
+        "hit_rate": 0.0,
+        "strategy_mean_return": 0.00123456,
+        "strategy_std": 0.00234567,
+        "annual_return": 0.123456,
+        "annualized_volatility": 0.234567,
+        "sharpe_ratio": 0.526315,
+    }
+
+    crypto_minute_backtest.print_summary(
+        args=args,
+        start_dt=datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc),
+        end_dt=datetime(2024, 4, 1, 23, 59, tzinfo=timezone.utc),
+        candle_count=1440,
+        metrics=metrics,
+        run_id=7,
+    )
+
+    output = capsys.readouterr().out
+
+    assert "Forecast windows evaluated: 1 (one forecast block)" in output
+    assert "Average absolute price error: 33.574141" in output
+    assert "Root mean squared price error: 38.270042" in output
+    assert "Average percentage error: 0.047197%" in output
+    assert "Symmetric average percentage error: 0.047187%" in output
+    assert "First predicted minute got the direction right: 100.00%" in output
+    assert "Final predicted minute got the direction right: 0.00%" in output
+    assert "Forecast windows with the correct overall direction: 0.00%" in output
+    assert "Average simulated return per forecast window: 0.1235%" in output
+    assert "Variation in simulated returns: 0.2346%" in output
+    assert "Estimated annual return: 12.35%" in output
+    assert "Estimated annualized volatility: 23.46%" in output
+    assert "Return-to-volatility ratio: 0.526315" in output
+    assert "MAE:" not in output
+    assert "RMSE:" not in output
+    assert "MAPE (%):" not in output
+    assert "SMAPE (%):" not in output

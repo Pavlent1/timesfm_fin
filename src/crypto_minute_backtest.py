@@ -646,25 +646,50 @@ def print_summary(
     metrics: dict[str, float | int],
     run_id: int,
 ) -> None:
+    window_count = int(metrics["windows"])
     print("Exchange: Binance")
     print(f"Symbol: {args.symbol}")
     print(f"UTC day: {args.day.isoformat()} ({start_dt.isoformat()} to {end_dt.isoformat()})")
     print(f"Candles read from PostgreSQL: {candle_count}")
     print(f"Backtest run id: {run_id}")
     print("")
-    print(f"Windows: {metrics['windows']}")
-    print(f"MAE: {metrics['mae']:.6f}")
-    print(f"RMSE: {metrics['rmse']:.6f}")
-    print(f"MAPE (%): {metrics['mape_pct']:.6f}")
-    print(f"SMAPE (%): {metrics['smape_pct']:.6f}")
-    print(f"Step1 directional accuracy: {metrics['step1_directional_accuracy']:.6f}")
-    print(f"End directional accuracy: {metrics['end_directional_accuracy']:.6f}")
-    print(f"Hit rate: {metrics['hit_rate']:.6f}")
-    print(f"Strategy mean return: {metrics['strategy_mean_return']:.8f}")
-    print(f"Strategy return std: {metrics['strategy_std']:.8f}")
-    print(f"Annual return: {metrics['annual_return']:.6f}")
-    print(f"Annualized volatility: {metrics['annualized_volatility']:.6f}")
-    print(f"Sharpe ratio: {metrics['sharpe_ratio']:.6f}")
+    if window_count == 1:
+        print("Forecast windows evaluated: 1 (one forecast block)")
+    else:
+        print(f"Forecast windows evaluated: {window_count}")
+    print(f"Average absolute price error: {metrics['mae']:.6f}")
+    print(f"Root mean squared price error: {metrics['rmse']:.6f}")
+    print(f"Average percentage error: {metrics['mape_pct']:.6f}%")
+    print(f"Symmetric average percentage error: {metrics['smape_pct']:.6f}%")
+    print(
+        "First predicted minute got the direction right: "
+        f"{metrics['step1_directional_accuracy'] * 100.0:.2f}%"
+    )
+    print(
+        "Final predicted minute got the direction right: "
+        f"{metrics['end_directional_accuracy'] * 100.0:.2f}%"
+    )
+    print(
+        "Forecast windows with the correct overall direction: "
+        f"{metrics['hit_rate'] * 100.0:.2f}%"
+    )
+    print(
+        "Average simulated return per forecast window: "
+        f"{metrics['strategy_mean_return'] * 100.0:.4f}%"
+    )
+    print(
+        "Variation in simulated returns: "
+        f"{metrics['strategy_std'] * 100.0:.4f}%"
+    )
+    print(f"Estimated annual return: {metrics['annual_return'] * 100.0:.2f}%")
+    print(
+        "Estimated annualized volatility: "
+        f"{metrics['annualized_volatility'] * 100.0:.2f}%"
+    )
+    print(
+        "Return-to-volatility ratio: "
+        f"{metrics['sharpe_ratio']:.6f}"
+    )
     print("")
     print(f"PostgreSQL: {args.host}:{args.port}/{args.db_name}")
     print("Per-step stats view: market_data.backtest_step_stats_vw")
