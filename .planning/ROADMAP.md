@@ -46,7 +46,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md - Metric semantics contract and reusable backtest metric module
+- [x] 02-01-PLAN.md - Metric semantics contract and reusable backtest metric module
 - [ ] 02-02-PLAN.md - PostgreSQL backtest schema, bootstrap, and query helpers
 - [ ] 02-03-PLAN.md - Crypto backtest runtime migration, wrapper updates, and operator docs
 
@@ -58,4 +58,4 @@ Phases execute in numeric order: 1 -> 2
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |
-| 2. Create backtest architecture, qualification rules, and statistics collection | 0/3 | Planned | - |
+| 2. Create backtest architecture, qualification rules, and statistics collection | 1/3 | In Progress | - |
