@@ -11,6 +11,7 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
 - Decimal phases (2.1, 2.2): Urgent insertions if needed later
 
 - [x] **Phase 1: Set up PostgreSQL database, download and discover all data, add sorting and organization** - Build the initial data foundation for storing, exploring, and organizing the project dataset. Completed 2026-04-13.
+- [ ] **Phase 2: Create backtest architecture, qualification rules, and statistics collection** - Define the backtest structure, qualification criteria, and statistics pipeline needed for trustworthy evaluation.
 
 ## Phase Details
 
@@ -32,11 +33,22 @@ Plans:
 - [x] 01-03-PLAN.md - Discovery, sorting, filtering, and integrity verification CLIs
 - [x] 01-04-PLAN.md - PostgreSQL-to-CSV materialization bridge and Phase 1 docs
 
+### Phase 2: Create backtest architecture, qualification rules, and statistics collection
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 1
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 2 to break down)
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1
+Phases execute in numeric order: 1 -> 2
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |
+| 2. Create backtest architecture, qualification rules, and statistics collection | 0/0 | Not planned | - |
