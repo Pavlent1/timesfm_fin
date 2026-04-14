@@ -22,6 +22,14 @@ if str(SRC_ROOT) not in sys.path:
 from postgres_dataset import bootstrap_schema, connect_postgres, load_postgres_settings
 
 
+DOCKER_FIXTURES = {
+    "repo_postgres_service",
+    "postgres_test_database",
+    "bootstrapped_postgres_connection",
+    "dataset_factory",
+}
+
+
 def run_checked_command(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         list(args),
@@ -172,3 +180,19 @@ class DatasetFactory:
 @pytest.fixture()
 def dataset_factory(bootstrapped_postgres_connection):
     return DatasetFactory(bootstrapped_postgres_connection)
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        node_path = str(item.path).replace("\\", "/")
+
+        if any(fixture_name in item.fixturenames for fixture_name in DOCKER_FIXTURES):
+            item.add_marker(pytest.mark.integration)
+            item.add_marker(pytest.mark.docker)
+            continue
+
+        if node_path.endswith("tests/test_docs_contract.py"):
+            item.add_marker(pytest.mark.contract)
+            continue
+
+        item.add_marker(pytest.mark.unit)
