@@ -727,7 +727,7 @@ def main() -> None:
             )
             return
 
-        start_dt, end_dt = day_bounds_utc(args.day)
+        requested_start_dt, requested_end_dt = day_bounds_utc(args.day)
         frame = load_backtest_frame(
             conn=conn,
             symbol=args.symbol,
@@ -743,11 +743,13 @@ def main() -> None:
             max_windows=args.max_windows,
             freq=args.freq,
         )
+        coverage_start_dt = pd.Timestamp(frame["open_time_utc"].iloc[0]).to_pydatetime()
+        coverage_end_dt = pd.Timestamp(frame["open_time_utc"].iloc[-1]).to_pydatetime()
         run_id = save_backtest(
             conn=conn,
             args=args,
-            start_dt=start_dt,
-            end_dt=end_dt,
+            start_dt=coverage_start_dt,
+            end_dt=coverage_end_dt,
             metrics=metrics,
             window_rows=window_rows,
         )
@@ -755,8 +757,8 @@ def main() -> None:
 
         print_summary(
             args=args,
-            start_dt=start_dt,
-            end_dt=end_dt,
+            start_dt=requested_start_dt,
+            end_dt=requested_end_dt,
             candle_count=len(frame),
             metrics=metrics,
             run_id=run_id,

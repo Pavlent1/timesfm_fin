@@ -352,3 +352,88 @@ def test_save_backtest_writes_run_window_and_step_rows(
         (0, 5.0, 5.0, 0.0, 0.0, "match"),
         (1, 6.0, 6.0, 0.0, 0.0, "match"),
     ]
+
+
+def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> None:
+    partial_day_frame = pd.DataFrame(
+        {
+            "open_time_utc": pd.date_range(
+                "2024-04-01T12:00:00Z",
+                periods=7,
+                freq="1min",
+                tz="UTC",
+            ),
+            "close": np.arange(100.0, 107.0, dtype=np.float64),
+        }
+    )
+    args = argparse.Namespace(
+        mode="backtest",
+        day=date(2024, 4, 1),
+        symbol="BTCUSDT",
+        context_len=4,
+        horizon_len=2,
+        stride=1,
+        batch_size=8,
+        max_windows=None,
+        freq=0,
+        backend="cpu",
+        repo_id="stub/repo",
+        host="127.0.0.1",
+        port=54329,
+        db_name="timesfm_fin",
+        user="timesfm",
+        password="timesfm_dev",
+        output_csv=None,
+    )
+    observed: dict[str, object] = {}
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def commit(self) -> None:
+            observed["committed"] = True
+
+    monkeypatch.setattr(crypto_minute_backtest, "parse_args", lambda: args)
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "postgres_settings_from_args",
+        lambda parsed_args: parsed_args,
+    )
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "build_model",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "connect_postgres",
+        lambda **kwargs: FakeConnection(),
+    )
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "load_backtest_frame",
+        lambda **kwargs: partial_day_frame,
+    )
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "run_backtest",
+        lambda **kwargs: ({"points": 7, "windows": 1}, []),
+    )
+
+    def fake_save_backtest(**kwargs) -> int:
+        observed["start_dt"] = kwargs["start_dt"]
+        observed["end_dt"] = kwargs["end_dt"]
+        return 42
+
+    monkeypatch.setattr(crypto_minute_backtest, "save_backtest", fake_save_backtest)
+    monkeypatch.setattr(crypto_minute_backtest, "print_summary", lambda **kwargs: None)
+
+    crypto_minute_backtest.main()
+
+    assert observed["start_dt"] == datetime(2024, 4, 1, 12, 0, tzinfo=timezone.utc)
+    assert observed["end_dt"] == datetime(2024, 4, 1, 12, 6, tzinfo=timezone.utc)
+    assert observed["committed"] is True

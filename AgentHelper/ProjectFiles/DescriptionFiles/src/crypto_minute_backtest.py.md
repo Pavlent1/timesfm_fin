@@ -15,7 +15,7 @@ Key responsibilities:
 - fetch recent Binance klines for live mode and persist them into PostgreSQL ingestion tables
 - batch forecast windows through TimesFM for faster rolling evaluation
 - derive error metrics, directional hit rate, and return-based statistics such as annualized volatility and Sharpe ratio
-- store `market_data.backtest_runs`, `market_data.backtest_windows`, and `market_data.backtest_prediction_steps` rows through the shared helper layer
+- store `market_data.backtest_runs`, `market_data.backtest_windows`, and `market_data.backtest_prediction_steps` rows through the shared helper layer, using the actual loaded candle span for persisted run coverage
 - print run summaries and optionally export live forecasts to CSV
 
 Important interactions:
