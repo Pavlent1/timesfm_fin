@@ -1,26 +1,46 @@
+from __future__ import annotations
+
 import argparse
-import json
 import math
-import sqlite3
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
 
 import numpy as np
 import pandas as pd
+import psycopg
 
-from binance_market_data import ONE_MINUTE_MS, fetch_binance_klines, to_utc_iso
+from backtest_metrics import build_step_metrics
+from binance_market_data import fetch_binance_klines
 from evaluate_forecast import directional_accuracy, mape, smape
+from postgres_backtest import (
+    create_backtest_run,
+    create_backtest_window,
+    insert_backtest_steps,
+)
+from postgres_dataset import (
+    PostgresSettings,
+    connect_postgres,
+    ensure_series,
+    finalize_ingestion_run,
+    load_postgres_settings,
+    start_ingestion_run,
+    upsert_observations,
+)
 from run_forecast import DEFAULT_REPO_ID, build_model
 
 
 MINUTES_PER_YEAR = 365 * 24 * 60
+DEFAULT_SOURCE_NAME = "binance"
+DEFAULT_TIMEFRAME = "1m"
+BINANCE_SOURCE_ENDPOINT = "https://api.binance.com/api/v3/klines"
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    defaults = load_postgres_settings()
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch Binance 1-minute BTC candles into SQLite and run either "
+            "Read Binance 1-minute candles from PostgreSQL and run either "
             "a rolling TimesFM backtest or a single live forecast."
         )
     )
@@ -31,15 +51,35 @@ def parse_args() -> argparse.Namespace:
         help="Run a historical backtest or a single live forecast.",
     )
     parser.add_argument(
-        "--db-path",
-        type=Path,
-        default=Path("outputs/crypto_backtest.sqlite"),
-        help="SQLite database used for candles, per-window predictions, and summaries.",
+        "--host",
+        default=defaults.host,
+        help="PostgreSQL host for the canonical market-data store.",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=defaults.port,
+        help="PostgreSQL port for the canonical market-data store.",
+    )
+    parser.add_argument(
+        "--db-name",
+        default=defaults.db_name,
+        help="PostgreSQL database name for the canonical market-data store.",
+    )
+    parser.add_argument(
+        "--user",
+        default=defaults.user,
+        help="PostgreSQL user for the canonical market-data store.",
+    )
+    parser.add_argument(
+        "--password",
+        default=defaults.password,
+        help="PostgreSQL password for the canonical market-data store.",
     )
     parser.add_argument(
         "--symbol",
         default="BTCUSDT",
-        help="Binance spot symbol to fetch. Default: BTCUSDT.",
+        help="Binance spot symbol to read or fetch. Default: BTCUSDT.",
     )
     parser.add_argument(
         "--day",
@@ -104,7 +144,19 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional CSV output path for live forecasts.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def postgres_settings_from_args(args: argparse.Namespace) -> PostgresSettings:
+    return load_postgres_settings(
+        {
+            "POSTGRES_HOST": args.host,
+            "POSTGRES_PORT": str(args.port),
+            "POSTGRES_DB": args.db_name,
+            "POSTGRES_USER": args.user,
+            "POSTGRES_PASSWORD": args.password,
+        }
+    )
 
 
 def parse_utc_day(value: str) -> date:
@@ -128,218 +180,160 @@ def latest_closed_minute_bounds(context_len: int) -> tuple[datetime, datetime]:
     return start_dt, end_dt
 
 
-def ensure_schema(conn: sqlite3.Connection) -> None:
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS candles (
-            exchange TEXT NOT NULL,
-            symbol TEXT NOT NULL,
-            interval TEXT NOT NULL,
-            open_time_ms INTEGER NOT NULL,
-            open_time_utc TEXT NOT NULL,
-            close_time_ms INTEGER NOT NULL,
-            close_time_utc TEXT NOT NULL,
-            open REAL NOT NULL,
-            high REAL NOT NULL,
-            low REAL NOT NULL,
-            close REAL NOT NULL,
-            volume REAL NOT NULL,
-            quote_asset_volume REAL NOT NULL,
-            trades INTEGER NOT NULL,
-            taker_buy_base_volume REAL NOT NULL,
-            taker_buy_quote_volume REAL NOT NULL,
-            PRIMARY KEY (exchange, symbol, interval, open_time_ms)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS backtest_runs (
-            run_id INTEGER PRIMARY KEY AUTOINCREMENT,
-            created_at_utc TEXT NOT NULL,
-            exchange TEXT NOT NULL,
-            symbol TEXT NOT NULL,
-            interval TEXT NOT NULL,
-            model_repo_id TEXT NOT NULL,
-            backend TEXT NOT NULL,
-            freq_bucket INTEGER NOT NULL,
-            context_len INTEGER NOT NULL,
-            horizon_len INTEGER NOT NULL,
-            stride INTEGER NOT NULL,
-            batch_size INTEGER NOT NULL,
-            data_start_utc TEXT NOT NULL,
-            data_end_utc TEXT NOT NULL,
-            points INTEGER NOT NULL,
-            windows INTEGER NOT NULL,
-            mae REAL NOT NULL,
-            rmse REAL NOT NULL,
-            mape_pct REAL NOT NULL,
-            smape_pct REAL NOT NULL,
-            step1_mae REAL NOT NULL,
-            step1_rmse REAL NOT NULL,
-            step1_directional_accuracy REAL NOT NULL,
-            end_directional_accuracy REAL NOT NULL,
-            hit_rate REAL NOT NULL,
-            strategy_mean_return REAL NOT NULL,
-            strategy_std REAL NOT NULL,
-            annual_return REAL NOT NULL,
-            annualized_volatility REAL NOT NULL,
-            sharpe_ratio REAL NOT NULL
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS backtest_predictions (
-            run_id INTEGER NOT NULL,
-            window_idx INTEGER NOT NULL,
-            target_start_utc TEXT NOT NULL,
-            context_end_utc TEXT NOT NULL,
-            context_last_close REAL NOT NULL,
-            predicted_step1_close REAL NOT NULL,
-            actual_step1_close REAL NOT NULL,
-            predicted_end_close REAL NOT NULL,
-            actual_end_close REAL NOT NULL,
-            predicted_return REAL NOT NULL,
-            actual_return REAL NOT NULL,
-            strategy_return REAL NOT NULL,
-            direction_correct INTEGER NOT NULL,
-            forecast_json TEXT NOT NULL,
-            actual_json TEXT NOT NULL,
-            PRIMARY KEY (run_id, window_idx),
-            FOREIGN KEY (run_id) REFERENCES backtest_runs (run_id)
-        )
-        """
-    )
-    conn.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_candles_lookup
-        ON candles (exchange, symbol, interval, open_time_ms)
-        """
-    )
-
-
-def store_candles(
-    conn: sqlite3.Connection,
-    exchange: str,
-    symbol: str,
-    interval: str,
-    rows: list[list],
-) -> int:
-    records = [
+def normalize_close_observations(rows: list[list]) -> list[tuple[datetime, float]]:
+    return [
         (
-            exchange,
-            symbol,
-            interval,
-            int(row[0]),
-            to_utc_iso(int(row[0])),
-            int(row[6]),
-            to_utc_iso(int(row[6])),
-            float(row[1]),
-            float(row[2]),
-            float(row[3]),
+            datetime.fromtimestamp(int(row[0]) / 1000, tz=timezone.utc),
             float(row[4]),
-            float(row[5]),
-            float(row[7]),
-            int(row[8]),
-            float(row[9]),
-            float(row[10]),
         )
         for row in rows
     ]
-    conn.executemany(
-        """
-        INSERT OR REPLACE INTO candles (
-            exchange,
-            symbol,
-            interval,
-            open_time_ms,
-            open_time_utc,
-            close_time_ms,
-            close_time_utc,
-            open,
-            high,
-            low,
-            close,
-            volume,
-            quote_asset_volume,
-            trades,
-            taker_buy_base_volume,
-            taker_buy_quote_volume
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        records,
-    )
-    return len(records)
 
 
-def load_candles(
-    conn: sqlite3.Connection,
-    exchange: str,
+def load_frame_range(
+    conn: psycopg.Connection,
+    *,
     symbol: str,
-    interval: str,
-    start_ms: int,
-    end_ms: int,
+    start_dt: datetime,
+    end_dt: datetime,
+    source_name: str = DEFAULT_SOURCE_NAME,
+    timeframe: str = DEFAULT_TIMEFRAME,
 ) -> pd.DataFrame:
-    frame = pd.read_sql_query(
-        """
-        SELECT
-            open_time_ms,
-            open_time_utc,
-            close
-        FROM candles
-        WHERE exchange = ?
-          AND symbol = ?
-          AND interval = ?
-          AND open_time_ms >= ?
-          AND open_time_ms < ?
-        ORDER BY open_time_ms
-        """,
-        conn,
-        params=(exchange, symbol, interval, start_ms, end_ms),
-    )
-    if frame.empty:
-        raise ValueError("No candles found in SQLite for the requested period.")
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT
+                o.observation_time_utc,
+                o.close_price
+            FROM market_data.series AS s
+            JOIN market_data.assets AS a ON a.asset_id = s.asset_id
+            JOIN market_data.observations AS o ON o.series_id = s.series_id
+            WHERE a.symbol = %s
+              AND s.source_name = %s
+              AND s.timeframe = %s
+              AND s.field_name = 'close_price'
+              AND o.observation_time_utc >= %s
+              AND o.observation_time_utc < %s
+            ORDER BY o.observation_time_utc
+            """,
+            (symbol, source_name, timeframe, start_dt, end_dt),
+        )
+        rows = cur.fetchall()
 
-    frame["open_time_utc"] = pd.to_datetime(frame["open_time_utc"], utc=True)
-    frame["close"] = frame["close"].astype(float)
-    return frame
+    if not rows:
+        raise ValueError(
+            "No PostgreSQL candles found for the requested period. "
+            "Ingest or persist the Binance data first."
+        )
+
+    return pd.DataFrame(
+        {
+            "open_time_utc": pd.to_datetime([row[0] for row in rows], utc=True),
+            "close": [float(row[1]) for row in rows],
+        }
+    )
+
+
+def load_backtest_frame(
+    conn: psycopg.Connection,
+    *,
+    symbol: str,
+    target_day: date,
+    source_name: str = DEFAULT_SOURCE_NAME,
+    timeframe: str = DEFAULT_TIMEFRAME,
+) -> pd.DataFrame:
+    start_dt, end_dt = day_bounds_utc(target_day)
+    return load_frame_range(
+        conn=conn,
+        symbol=symbol,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        source_name=source_name,
+        timeframe=timeframe,
+    )
+
+
+def persist_binance_rows(
+    conn: psycopg.Connection,
+    *,
+    symbol: str,
+    rows: list[list],
+    requested_start_utc: datetime,
+    requested_end_utc: datetime,
+    source_name: str = DEFAULT_SOURCE_NAME,
+    timeframe: str = DEFAULT_TIMEFRAME,
+) -> int:
+    series_id = ensure_series(
+        conn=conn,
+        symbol=symbol,
+        source_name=source_name,
+        timeframe=timeframe,
+    )
+    ingestion_run_id = start_ingestion_run(
+        conn=conn,
+        series_id=series_id,
+        source_endpoint=BINANCE_SOURCE_ENDPOINT,
+        requested_start_utc=requested_start_utc,
+        requested_end_utc=requested_end_utc,
+        notes={"symbol": symbol, "timeframe": timeframe, "mode": "live"},
+    )
+    observations = normalize_close_observations(rows)
+    actual_start_utc = observations[0][0] if observations else None
+    actual_end_utc = observations[-1][0] if observations else None
+    rows_written = upsert_observations(
+        conn=conn,
+        series_id=series_id,
+        ingestion_run_id=ingestion_run_id,
+        observations=observations,
+    )
+    finalize_ingestion_run(
+        conn=conn,
+        ingestion_run_id=ingestion_run_id,
+        actual_start_utc=actual_start_utc,
+        actual_end_utc=actual_end_utc,
+        rows_written=rows_written,
+        status="completed" if observations else "empty",
+        notes={"symbol": symbol, "timeframe": timeframe, "mode": "live"},
+    )
+    return rows_written
 
 
 def prepare_live_frame(
-    conn: sqlite3.Connection,
+    conn: psycopg.Connection,
     symbol: str,
     context_len: int,
+    source_name: str = DEFAULT_SOURCE_NAME,
+    timeframe: str = DEFAULT_TIMEFRAME,
 ) -> tuple[pd.DataFrame, datetime, datetime]:
     start_dt, end_dt = latest_closed_minute_bounds(context_len=context_len)
-    start_ms = int(start_dt.timestamp() * 1000)
-    end_ms = int(end_dt.timestamp() * 1000)
 
     fetched_rows = fetch_binance_klines(
         symbol=symbol,
-        start_ms=start_ms,
-        end_ms=end_ms,
-        interval="1m",
+        start_ms=int(start_dt.timestamp() * 1000),
+        end_ms=int(end_dt.timestamp() * 1000),
+        interval=timeframe,
     )
     if not fetched_rows:
         raise ValueError("No live candles returned from Binance.")
 
-    with conn:
-        store_candles(
-            conn,
-            exchange="binance",
-            symbol=symbol,
-            interval="1m",
-            rows=fetched_rows,
-        )
-
-    frame = load_candles(
-        conn,
-        exchange="binance",
+    persist_binance_rows(
+        conn=conn,
         symbol=symbol,
-        interval="1m",
-        start_ms=start_ms,
-        end_ms=end_ms,
+        rows=fetched_rows,
+        requested_start_utc=start_dt,
+        requested_end_utc=end_dt,
+        source_name=source_name,
+        timeframe=timeframe,
+    )
+    conn.commit()
+
+    frame = load_frame_range(
+        conn=conn,
+        symbol=symbol,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        source_name=source_name,
+        timeframe=timeframe,
     )
     if len(frame) < context_len:
         raise ValueError(
@@ -359,7 +353,10 @@ def annualized_volatility(returns: pd.Series, periods_per_year: float) -> float:
     clean_returns = returns.dropna().astype(float)
     if clean_returns.size < 2:
         return 0.0
-    return float(np.std(clean_returns.to_numpy(dtype=np.float64)) * math.sqrt(periods_per_year))
+    return float(
+        np.std(clean_returns.to_numpy(dtype=np.float64))
+        * math.sqrt(periods_per_year)
+    )
 
 
 def sharpe_ratio(
@@ -376,7 +373,7 @@ def sharpe_ratio(
 
 def batched(values: list[int], batch_size: int) -> Iterable[list[int]]:
     for idx in range(0, len(values), batch_size):
-        yield values[idx:idx + batch_size]
+        yield values[idx : idx + batch_size]
 
 
 def select_independent_returns(
@@ -385,7 +382,9 @@ def select_independent_returns(
     stride: int,
 ) -> tuple[pd.Series, int]:
     non_overlap_step = max(1, math.ceil(horizon_len / stride))
-    independent_returns = strategy_returns.iloc[::non_overlap_step].reset_index(drop=True)
+    independent_returns = strategy_returns.iloc[::non_overlap_step].reset_index(
+        drop=True
+    )
     return independent_returns, non_overlap_step
 
 
@@ -398,9 +397,9 @@ def run_backtest(
     batch_size: int,
     max_windows: int | None,
     freq: int,
-) -> tuple[dict[str, float | int], list[tuple]]:
+) -> tuple[dict[str, float | int], list[dict[str, object]]]:
     values = frame["close"].to_numpy(dtype=np.float64)
-    timestamps = frame["open_time_utc"]
+    timestamps = pd.to_datetime(frame["open_time_utc"], utc=True)
 
     if values.size < context_len + horizon_len + 1:
         raise ValueError(
@@ -414,7 +413,7 @@ def run_backtest(
     if not start_indices:
         raise ValueError("The chosen context/horizon/stride produced zero backtest windows.")
 
-    prediction_rows: list[tuple] = []
+    window_rows: list[dict[str, object]] = []
     all_predictions: list[np.ndarray] = []
     all_actuals: list[np.ndarray] = []
     all_last_context: list[float] = []
@@ -423,7 +422,7 @@ def run_backtest(
 
     for window_batch in batched(start_indices, batch_size=batch_size):
         contexts = [
-            values[start - context_len:start].astype(np.float32)
+            values[start - context_len : start].astype(np.float32)
             for start in window_batch
         ]
         predictions_batch, _ = model.forecast(contexts, freq=[freq] * len(window_batch))
@@ -431,36 +430,55 @@ def run_backtest(
 
         for batch_offset, start in enumerate(window_batch):
             prediction = predictions_batch[batch_offset][:horizon_len]
-            actual = values[start:start + horizon_len].astype(np.float64)
+            actual = values[start : start + horizon_len].astype(np.float64)
             last_context_close = float(values[start - 1])
-            predicted_return = float((prediction[-1] - last_context_close) / last_context_close)
+            predicted_return = float(
+                (prediction[-1] - last_context_close) / last_context_close
+            )
             actual_return = float((actual[-1] - last_context_close) / last_context_close)
             position = float(np.sign(predicted_return))
             strategy_return = float(position * actual_return)
             direction_correct = int(np.sign(predicted_return) == np.sign(actual_return))
+
+            step_rows: list[dict[str, object]] = []
+            for step_offset, (predicted_close, actual_close) in enumerate(
+                zip(prediction, actual)
+            ):
+                step_metrics = build_step_metrics(
+                    last_input_close=last_context_close,
+                    predicted_close=float(predicted_close),
+                    actual_close=float(actual_close),
+                )
+                step_rows.append(
+                    {
+                        "step_index": step_offset,
+                        "target_time_utc": pd.Timestamp(
+                            timestamps.iloc[start + step_offset]
+                        ),
+                        "last_input_close": last_context_close,
+                        "predicted_close": float(predicted_close),
+                        "actual_close": float(actual_close),
+                        "normalized_deviation_pct": step_metrics[
+                            "normalized_deviation_pct"
+                        ],
+                        "signed_deviation_pct": step_metrics["signed_deviation_pct"],
+                        "overshoot_label": step_metrics["overshoot_label"],
+                    }
+                )
 
             all_predictions.append(prediction)
             all_actuals.append(actual)
             all_last_context.append(last_context_close)
             all_strategy_returns.append(strategy_return)
             all_direction_correct.append(direction_correct)
-            prediction_rows.append(
-                (
-                    len(prediction_rows),
-                    timestamps.iloc[start].isoformat(),
-                    timestamps.iloc[start - 1].isoformat(),
-                    last_context_close,
-                    float(prediction[0]),
-                    float(actual[0]),
-                    float(prediction[-1]),
-                    float(actual[-1]),
-                    predicted_return,
-                    actual_return,
-                    strategy_return,
-                    direction_correct,
-                    json.dumps(prediction.tolist()),
-                    json.dumps(actual.tolist()),
-                )
+            window_rows.append(
+                {
+                    "window_index": len(window_rows),
+                    "target_start_utc": pd.Timestamp(timestamps.iloc[start]),
+                    "context_end_utc": pd.Timestamp(timestamps.iloc[start - 1]),
+                    "last_input_close": last_context_close,
+                    "steps": step_rows,
+                }
             )
 
     predictions = np.vstack(all_predictions)
@@ -490,127 +508,94 @@ def run_backtest(
         "mape_pct": mape(flat_actuals, flat_predictions),
         "smape_pct": smape(flat_actuals, flat_predictions),
         "step1_mae": float(np.mean(np.abs(step1_predictions - step1_actuals))),
-        "step1_rmse": float(np.sqrt(np.mean((step1_predictions - step1_actuals) ** 2))),
+        "step1_rmse": float(
+            np.sqrt(np.mean((step1_predictions - step1_actuals) ** 2))
+        ),
         "step1_directional_accuracy": directional_accuracy(
-            step1_predictions, step1_actuals, last_context
+            step1_predictions,
+            step1_actuals,
+            last_context,
         ),
         "end_directional_accuracy": directional_accuracy(
-            end_predictions, end_actuals, last_context
+            end_predictions,
+            end_actuals,
+            last_context,
         ),
         "hit_rate": float(np.mean(np.asarray(all_direction_correct, dtype=np.float64))),
         "strategy_mean_return": float(independent_returns.mean()),
         "strategy_std": float(independent_returns.std(ddof=0)),
         "annual_return": annual_returns(
-            independent_returns, periods_per_year=effective_periods_per_year
+            independent_returns,
+            periods_per_year=effective_periods_per_year,
         ),
         "annualized_volatility": annualized_volatility(
-            independent_returns, periods_per_year=effective_periods_per_year
+            independent_returns,
+            periods_per_year=effective_periods_per_year,
         ),
         "sharpe_ratio": sharpe_ratio(
-            independent_returns, periods_per_year=effective_periods_per_year
+            independent_returns,
+            periods_per_year=effective_periods_per_year,
         ),
     }
-    return metrics, prediction_rows
+    return metrics, window_rows
 
 
 def save_backtest(
-    conn: sqlite3.Connection,
+    conn: psycopg.Connection,
     args: argparse.Namespace,
     start_dt: datetime,
     end_dt: datetime,
     metrics: dict[str, float | int],
-    prediction_rows: list[tuple],
+    window_rows: list[dict[str, object]],
 ) -> int:
-    cursor = conn.execute(
-        """
-        INSERT INTO backtest_runs (
-            created_at_utc,
-            exchange,
-            symbol,
-            interval,
-            model_repo_id,
-            backend,
-            freq_bucket,
-            context_len,
-            horizon_len,
-            stride,
-            batch_size,
-            data_start_utc,
-            data_end_utc,
-            points,
-            windows,
-            mae,
-            rmse,
-            mape_pct,
-            smape_pct,
-            step1_mae,
-            step1_rmse,
-            step1_directional_accuracy,
-            end_directional_accuracy,
-            hit_rate,
-            strategy_mean_return,
-            strategy_std,
-            annual_return,
-            annualized_volatility,
-            sharpe_ratio
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (
-            datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            "binance",
-            args.symbol,
-            "1m",
-            args.repo_id,
-            args.backend,
-            args.freq,
-            args.context_len,
-            args.horizon_len,
-            args.stride,
-            args.batch_size,
-            start_dt.isoformat(),
-            end_dt.isoformat(),
-            metrics["points"],
-            metrics["windows"],
-            metrics["mae"],
-            metrics["rmse"],
-            metrics["mape_pct"],
-            metrics["smape_pct"],
-            metrics["step1_mae"],
-            metrics["step1_rmse"],
-            metrics["step1_directional_accuracy"],
-            metrics["end_directional_accuracy"],
-            metrics["hit_rate"],
-            metrics["strategy_mean_return"],
-            metrics["strategy_std"],
-            metrics["annual_return"],
-            metrics["annualized_volatility"],
-            metrics["sharpe_ratio"],
-        ),
+    run_id = create_backtest_run(
+        conn=conn,
+        exchange=DEFAULT_SOURCE_NAME,
+        symbol=args.symbol,
+        interval=DEFAULT_TIMEFRAME,
+        model_repo_id=args.repo_id,
+        backend=args.backend,
+        freq_bucket=args.freq,
+        context_len=args.context_len,
+        horizon_len=args.horizon_len,
+        stride=args.stride,
+        batch_size=args.batch_size,
+        data_start_utc=start_dt,
+        data_end_utc=end_dt,
+        points=int(metrics["points"]),
+        windows=int(metrics["windows"]),
     )
-    run_id = int(cursor.lastrowid)
 
-    conn.executemany(
-        """
-        INSERT INTO backtest_predictions (
-            run_id,
-            window_idx,
-            target_start_utc,
-            context_end_utc,
-            context_last_close,
-            predicted_step1_close,
-            actual_step1_close,
-            predicted_end_close,
-            actual_end_close,
-            predicted_return,
-            actual_return,
-            strategy_return,
-            direction_correct,
-            forecast_json,
-            actual_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        [(run_id, *row) for row in prediction_rows],
-    )
+    for window_row in window_rows:
+        window_id = create_backtest_window(
+            conn=conn,
+            run_id=run_id,
+            window_index=int(window_row["window_index"]),
+            target_start_utc=window_row["target_start_utc"].to_pydatetime(),
+            context_end_utc=window_row["context_end_utc"].to_pydatetime(),
+            last_input_close=float(window_row["last_input_close"]),
+        )
+        insert_backtest_steps(
+            conn=conn,
+            rows=[
+                {
+                    "run_id": run_id,
+                    "window_id": window_id,
+                    "step_index": int(step_row["step_index"]),
+                    "target_time_utc": step_row["target_time_utc"].to_pydatetime(),
+                    "last_input_close": float(step_row["last_input_close"]),
+                    "predicted_close": float(step_row["predicted_close"]),
+                    "actual_close": float(step_row["actual_close"]),
+                    "normalized_deviation_pct": float(
+                        step_row["normalized_deviation_pct"]
+                    ),
+                    "signed_deviation_pct": float(step_row["signed_deviation_pct"]),
+                    "overshoot_label": str(step_row["overshoot_label"]),
+                }
+                for step_row in window_row["steps"]
+            ],
+        )
+
     return run_id
 
 
@@ -661,11 +646,11 @@ def print_summary(
     metrics: dict[str, float | int],
     run_id: int,
 ) -> None:
-    print(f"Exchange: Binance")
+    print("Exchange: Binance")
     print(f"Symbol: {args.symbol}")
     print(f"UTC day: {args.day.isoformat()} ({start_dt.isoformat()} to {end_dt.isoformat()})")
-    print(f"Candles stored/read: {candle_count}")
-    print(f"Run id: {run_id}")
+    print(f"Candles read from PostgreSQL: {candle_count}")
+    print(f"Backtest run id: {run_id}")
     print("")
     print(f"Windows: {metrics['windows']}")
     print(f"MAE: {metrics['mae']:.6f}")
@@ -681,7 +666,8 @@ def print_summary(
     print(f"Annualized volatility: {metrics['annualized_volatility']:.6f}")
     print(f"Sharpe ratio: {metrics['sharpe_ratio']:.6f}")
     print("")
-    print(f"SQLite database: {args.db_path.resolve()}")
+    print(f"PostgreSQL: {args.host}:{args.port}/{args.db_name}")
+    print("Per-step stats view: market_data.backtest_step_stats_vw")
 
 
 def print_live_forecast(
@@ -698,6 +684,7 @@ def print_live_forecast(
     print(f"Context window: {context_start} to {context_end}")
     print(f"Context candles used: {len(frame)}")
     print(f"Latest observed close: {latest_close:.4f}")
+    print(f"PostgreSQL: {args.host}:{args.port}/{args.db_name}")
     print("")
     print(forecast_df.to_string(index=False))
 
@@ -710,21 +697,18 @@ def print_live_forecast(
 
 def main() -> None:
     args = parse_args()
+    settings = postgres_settings_from_args(args)
 
-    args.db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(args.db_path)
-    try:
-        ensure_schema(conn)
+    model = build_model(
+        context_len=args.context_len,
+        horizon_len=args.horizon_len,
+        backend=args.backend,
+        repo_id=args.repo_id,
+    )
 
-        model = build_model(
-            context_len=args.context_len,
-            horizon_len=args.horizon_len,
-            backend=args.backend,
-            repo_id=args.repo_id,
-        )
-
+    with connect_postgres(settings=settings, autocommit=False) as conn:
         if args.mode == "live":
-            frame, start_dt, end_dt = prepare_live_frame(
+            frame, _, _ = prepare_live_frame(
                 conn=conn,
                 symbol=args.symbol,
                 context_len=args.context_len,
@@ -741,66 +725,42 @@ def main() -> None:
                 latest_close=latest_close,
                 forecast_df=forecast_df,
             )
-        else:
-            start_dt, end_dt = day_bounds_utc(args.day)
-            start_ms = int(start_dt.timestamp() * 1000)
-            end_ms = int(end_dt.timestamp() * 1000)
+            return
 
-            fetched_rows = fetch_binance_klines(
-                symbol=args.symbol,
-                start_ms=start_ms,
-                end_ms=end_ms,
-                interval="1m",
-            )
-            with conn:
-                store_candles(
-                    conn,
-                    exchange="binance",
-                    symbol=args.symbol,
-                    interval="1m",
-                    rows=fetched_rows,
-                )
+        start_dt, end_dt = day_bounds_utc(args.day)
+        frame = load_backtest_frame(
+            conn=conn,
+            symbol=args.symbol,
+            target_day=args.day,
+        )
+        metrics, window_rows = run_backtest(
+            model=model,
+            frame=frame,
+            context_len=args.context_len,
+            horizon_len=args.horizon_len,
+            stride=args.stride,
+            batch_size=args.batch_size,
+            max_windows=args.max_windows,
+            freq=args.freq,
+        )
+        run_id = save_backtest(
+            conn=conn,
+            args=args,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            metrics=metrics,
+            window_rows=window_rows,
+        )
+        conn.commit()
 
-            frame = load_candles(
-                conn,
-                exchange="binance",
-                symbol=args.symbol,
-                interval="1m",
-                start_ms=start_ms,
-                end_ms=end_ms,
-            )
-
-            metrics, prediction_rows = run_backtest(
-                model=model,
-                frame=frame,
-                context_len=args.context_len,
-                horizon_len=args.horizon_len,
-                stride=args.stride,
-                batch_size=args.batch_size,
-                max_windows=args.max_windows,
-                freq=args.freq,
-            )
-
-            with conn:
-                run_id = save_backtest(
-                    conn=conn,
-                    args=args,
-                    start_dt=start_dt,
-                    end_dt=end_dt,
-                    metrics=metrics,
-                    prediction_rows=prediction_rows,
-                )
-
-            print_summary(
-                args=args,
-                start_dt=start_dt,
-                end_dt=end_dt,
-                candle_count=len(frame),
-                metrics=metrics,
-                run_id=run_id,
-            )
-    finally:
-        conn.close()
+        print_summary(
+            args=args,
+            start_dt=start_dt,
+            end_dt=end_dt,
+            candle_count=len(frame),
+            metrics=metrics,
+            run_id=run_id,
+        )
 
 
 if __name__ == "__main__":

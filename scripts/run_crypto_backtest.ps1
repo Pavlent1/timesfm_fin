@@ -7,10 +7,14 @@ param(
     [int]$Stride = 1,
     [int]$BatchSize = 64,
     [string]$Backend = "gpu",
-    [string]$DbPath = "/workspace/outputs/crypto_backtest.sqlite",
     [string]$OutputCsv = "",
     [int]$Freq = 0,
     [Nullable[int]]$MaxWindows = $null,
+    [string]$PostgresHost = "host.docker.internal",
+    [int]$PostgresPort = 54329,
+    [string]$PostgresDb = "timesfm_fin",
+    [string]$PostgresUser = "timesfm",
+    [string]$PostgresPassword = "timesfm_dev",
     [switch]$Live,
     [switch]$SkipBuild
 )
@@ -41,7 +45,20 @@ if (-not $SkipBuild) {
 
 $containerArgs = @(
     "run",
-    "--rm",
+    "--rm"
+)
+
+if ($Backend -eq "gpu") {
+    $containerArgs += @("--gpus", "all")
+}
+
+$containerArgs += @(
+    "--add-host", "host.docker.internal:host-gateway",
+    "-e", "POSTGRES_HOST=$PostgresHost",
+    "-e", "POSTGRES_PORT=$PostgresPort",
+    "-e", "POSTGRES_DB=$PostgresDb",
+    "-e", "POSTGRES_USER=$PostgresUser",
+    "-e", "POSTGRES_PASSWORD=$PostgresPassword",
     "-v", "${resolvedRepoRoot}:/workspace",
     "--entrypoint", "python",
     $ImageName,
@@ -52,13 +69,8 @@ $containerArgs = @(
     "--stride", "$Stride",
     "--batch-size", "$BatchSize",
     "--backend", $Backend,
-    "--db-path", $DbPath,
     "--freq", "$Freq"
 )
-
-if ($Backend -eq "gpu") {
-    $containerArgs = @("run", "--rm", "--gpus", "all", "-v", "${resolvedRepoRoot}:/workspace", "--entrypoint", "python", $ImageName, "src/crypto_minute_backtest.py", "--symbol", $Symbol, "--context-len", "$ContextLen", "--horizon-len", "$HorizonLen", "--stride", "$Stride", "--batch-size", "$BatchSize", "--backend", $Backend, "--db-path", $DbPath, "--freq", "$Freq")
-}
 
 if ($Day -ne "") {
     $containerArgs += @("--day", $Day)
@@ -76,5 +88,5 @@ if ($OutputCsv -ne "") {
     $containerArgs += @("--output-csv", $OutputCsv)
 }
 
-Write-Host "Running crypto minute backtest from '$resolvedRepoRoot'..."
+Write-Host "Running crypto minute backtest from '$resolvedRepoRoot' with PostgreSQL at ${PostgresHost}:$PostgresPort..."
 Invoke-CheckedCommand "docker" @containerArgs
