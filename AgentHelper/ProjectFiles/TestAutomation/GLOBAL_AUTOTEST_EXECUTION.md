@@ -10,10 +10,10 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 ## Wave Summary
 
 - Overall status: `in_progress`
-- Current wave: `Wave 1`
-- Next wave: `Wave 2`
-- Current step: Wave 1 is complete and the refreshed audit artifacts are recorded
-- Next step: start Wave 2 direct coverage for `src/binance_market_data.py` and `src/bootstrap_postgres.py`
+- Current wave: `Wave 2`
+- Next wave: `Wave 3`
+- Current step: Wave 2 direct coverage is in progress for `src/binance_market_data.py` and `src/bootstrap_postgres.py`
+- Next step: finish the two Wave 2 scopes, run the wave-level audit refresh, and then advance to Wave 3
 - Next recommended command: `Use $helper-test-execute-plan wave 2`
 
 ## Preflight
@@ -28,12 +28,26 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 | Wave | Status | Completed scopes | Commands run | Failures encountered | Blockers | Remaining risk |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `complete` | Scope A `scripts/testing/` helper restoration; Scope B pytest marker/config split; Scope C audit refresh | `helper-test-execute-plan` preflight; `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 1 of the global autotest plan"`; `node scripts/testing/discover-test-landscape.mjs --markdown`; `node scripts/testing/measure-coverage.mjs --markdown`; `node scripts/testing/summarize-test-gaps.mjs --markdown`; `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`; `.\.venv\Scripts\python.exe -m pytest --collect-only -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs` | Resolved during scope work: gap summarizer initially counted docs-contract mentions as direct coverage; affected-test parsing initially mangled porcelain paths | None active | Coverage measurement is still unavailable because no plugin is installed; most integration tests still depend on Docker |
-| 2 | `pending` | None | None | None | Depends on Wave 1 | Shared adapter and bootstrap coverage remains unstarted |
+| 2 | `in_progress` | None | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"` | None | None active | Shared adapter and bootstrap coverage is mid-execution |
 | 3 | `pending` | None | None | None | Depends on Wave 1 and a Docker-ready environment for final validation | PostgreSQL integration coverage remains coupled to Docker availability |
 | 4 | `pending` | None | None | None | Depends on Waves 1-2 | Forecast and crypto workflow coverage remains absent |
 | 5 | `pending` | None | None | None | Depends on Waves 1-4 | Coverage refresh and deferral documentation remain stale until later waves land |
 
 ## Current Wave Detail
+
+### Wave 2
+
+- Status: `in_progress`
+- Completed scopes:
+  - None yet
+- Commands run:
+  - `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"`
+- Failures encountered:
+  - None yet
+- Blockers:
+  - None active
+- Remaining risk:
+  - Direct coverage is still missing for the Binance pagination adapter and PostgreSQL bootstrap CLI
 
 ### Wave 1
 

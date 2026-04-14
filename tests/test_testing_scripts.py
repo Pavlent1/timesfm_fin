@@ -38,8 +38,10 @@ def test_summarize_test_gaps_highlights_known_missing_coverage() -> None:
     output = run_node_script("scripts/testing/summarize-test-gaps.mjs", "--markdown")
 
     assert "# Test Gap Summary" in output
-    assert "`src/bootstrap_postgres.py`" in output
-    assert "`src/binance_market_data.py`" in output
+    assert "## Missing Direct Coverage" in output
+    assert "`src/binance_market_data.py`" not in output
+    assert "`src/bootstrap_postgres.py`" not in output
+    assert "`src/crypto_minute_backtest.py`" in output
 
 
 def test_find_affected_tests_reports_markdown_output() -> None:
