@@ -58,6 +58,17 @@ def default_schema_path() -> Path:
     return Path(__file__).resolve().parents[1] / "db" / "init" / "001_phase1_schema.sql"
 
 
+def schema_sql_paths(schema_path: Path | None = None) -> list[Path]:
+    anchor_path = schema_path or default_schema_path()
+    schema_dir = anchor_path if anchor_path.is_dir() else anchor_path.parent
+    sql_paths = sorted(
+        path for path in schema_dir.glob("*.sql") if path.is_file()
+    )
+    if not sql_paths:
+        raise ValueError(f"No schema SQL files found under {schema_dir}.")
+    return sql_paths
+
+
 def connect_postgres(
     settings: PostgresSettings | None = None,
     db_name: str | None = None,
@@ -98,10 +109,11 @@ def bootstrap_schema(
     conn: psycopg.Connection,
     schema_path: Path | None = None,
 ) -> None:
-    sql_path = schema_path or default_schema_path()
-    sql_text = sql_path.read_text(encoding="utf-8")
+    sql_paths = schema_sql_paths(schema_path)
     with conn.cursor() as cur:
-        cur.execute(sql_text)
+        for sql_path in sql_paths:
+            sql_text = sql_path.read_text(encoding="utf-8")
+            cur.execute(sql_text)
     conn.commit()
 
 

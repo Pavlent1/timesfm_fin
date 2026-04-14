@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
     defaults = load_postgres_settings()
 
     parser = argparse.ArgumentParser(
-        description="Apply the checked-in PostgreSQL Phase 1 schema."
+        description="Apply the checked-in PostgreSQL schema set."
     )
     parser.add_argument("--host", default=defaults.host, help="PostgreSQL host.")
     parser.add_argument("--port", type=int, default=defaults.port, help="PostgreSQL port.")
@@ -32,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         "--schema-file",
         type=Path,
         default=default_schema_path(),
-        help="SQL file applied to the target database.",
+        help="Checked-in schema anchor file; bootstrap applies all sibling db/init/*.sql files in lexical order.",
     )
     parser.add_argument(
         "--wait-seconds",
