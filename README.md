@@ -145,24 +145,42 @@ Notes:
 - The PostgreSQL service is a local development dependency, not a hosted or shared production service.
 - Schema details live in `db/README.md`.
 
-## Crypto minute backtest with SQLite
+## Crypto minute backtest with PostgreSQL
 
-For a rolling crypto experiment on Binance 1-minute candles, use
-`src/crypto_minute_backtest.py`. It fetches one full UTC day of `BTCUSDT`
-history into SQLite, runs a rolling TimesFM backtest across that day, stores
-every forecast window in SQLite, and saves summary metrics including Sharpe and
-standard deviation / annualized volatility.
+Phase 2 moves the crypto minute backtest onto the same PostgreSQL store used by
+the dataset foundation. The canonical flow is:
 
-Example:
+1. start the local PostgreSQL service
+2. apply the checked-in schema
+3. ingest the source Binance dataset into PostgreSQL
+4. run the backtest against PostgreSQL-backed candles
+5. inspect per-step statistics in `market_data.backtest_step_stats_vw`
+
+Backtest example:
 
 ```bash
-python src/crypto_minute_backtest.py --day 2026-04-11 --db-path outputs/crypto_backtest.sqlite --context-len 512 --horizon-len 16 --batch-size 64
+python src/crypto_minute_backtest.py --day 2026-04-11 --context-len 512 --horizon-len 16 --batch-size 64
 ```
 
-From the VS Code terminal on Windows, the simplest path is the PowerShell
-wrapper below. It builds the Docker image if needed and runs the backtest from
-your current repo checkout. The wrapper defaults to `gpu` and requests Docker
-GPU access automatically:
+The backtest reads one UTC day of `binance` / `BTCUSDT` / `1m` candles from the
+Phase 1 PostgreSQL tables and writes run metadata, per-window facts, and
+per-step prediction metrics back into PostgreSQL through the shared Phase 2
+helpers.
+
+Inspect per-step stats for one stored run:
+
+```sql
+SELECT *
+FROM market_data.backtest_step_stats_vw
+WHERE run_id = 1
+ORDER BY step_index;
+```
+
+From the VS Code terminal on Windows, the PowerShell wrapper below builds the
+Docker image if needed and runs the backtest from your current repo checkout.
+The wrapper injects PostgreSQL connection settings into the container, uses
+`POSTGRES_HOST=host.docker.internal`, and adds the Docker host mapping needed
+for Linux-compatible host-gateway routing:
 
 ```powershell
 .\scripts\run_crypto_backtest.ps1 -Day 2026-04-11
@@ -174,11 +192,13 @@ You can pass the main tuning knobs directly from the terminal as well:
 .\scripts\run_crypto_backtest.ps1 -Day 2026-04-11 -Symbol BTCUSDT -ContextLen 512 -HorizonLen 16 -BatchSize 64
 ```
 
-The script writes three SQLite tables:
+Live mode still fetches the latest Binance candles, but it persists those
+freshly fetched rows into PostgreSQL before forecasting so the database remains
+the single canonical store:
 
-- `candles`: raw 1-minute OHLCV candles from Binance
-- `backtest_runs`: one row per completed experiment with summary metrics
-- `backtest_predictions`: one row per rolling forecast window with predicted and actual paths
+```bash
+python src/crypto_minute_backtest.py --mode live --context-len 512 --horizon-len 16 --output-csv outputs/live_forecast.csv
+```
 
 Runtime note:
 
