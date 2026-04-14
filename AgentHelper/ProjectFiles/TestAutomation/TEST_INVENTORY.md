@@ -3,6 +3,7 @@
 - Date: 2026-04-14
 - Scope: whole approved codebase (`src/`, `configs/`, `scripts/`)
 - Collected tests: 48 via `.\.venv\Scripts\python.exe -m pytest --collect-only -q`
+- Refresh note: reconfirmed during Wave 5 with live discovery, collect-only, both pytest marker slices, and the repo-managed precommit gate
 
 ## Test Files
 
@@ -64,12 +65,10 @@
 
 | Production area | Current test state |
 | --- | --- |
-| `src/main.py` | No direct test coverage |
-| `src/train.py` | No direct test coverage |
 | `src/evaluation.py` | No direct test coverage |
 | `src/train_flax.py` | No direct test coverage |
 | `src/mock_trading.py` | No direct test coverage |
 | `src/mock_trading_utils.py` | No direct test coverage |
 | `src/utils.py` | No direct test coverage |
 | `configs/fine_tuning.py` | No direct test coverage |
-| `scripts/precommit-checks.mjs` | Exercised manually during audit and commit hooks only; no dedicated automated test coverage detected |
+| `scripts/precommit-checks.mjs` | Exercised by Wave 5 audit runs and commit hooks only; no dedicated automated test coverage detected |

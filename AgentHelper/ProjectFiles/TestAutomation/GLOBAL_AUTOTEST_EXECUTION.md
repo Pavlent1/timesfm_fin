@@ -1,6 +1,6 @@
 ---
 artifact: global-autotest-execution
-status: in_progress
+status: complete
 updated: 2026-04-14
 plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 ---
@@ -9,12 +9,12 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 
 ## Wave Summary
 
-- Overall status: `in_progress`
-- Current wave: `Wave 5`
+- Overall status: `complete`
+- Current wave: `None`
 - Next wave: `None`
-- Current step: Waves 3 and 4 are complete and the audit artifacts now reflect the broader direct-coverage footprint
-- Next step: execute Wave 5 coverage refresh and deferral recording
-- Next recommended command: `Use $helper-test-execute-plan wave 5`
+- Current step: Wave 5 is complete and the refreshed audit artifacts now match the live repo state
+- Next step: revisit test preferences or create a follow-on plan only if you want to remove the remaining explicit deferrals
+- Next recommended command: `Use $helper-test-preferences`
 
 ## Preflight
 
@@ -31,7 +31,7 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
 | 2 | `complete` | Scope A `src/binance_market_data.py`; Scope B `src/bootstrap_postgres.py` | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 2 of the global autotest plan"`; classifier runs for Wave 2 sources; `.\.venv\Scripts\python.exe -m pytest tests/test_binance_market_data.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_bootstrap_postgres.py -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; helper-script refresh; `node scripts/precommit-checks.mjs` | Resolved during scope work: Windows path separator assertion mismatch in `tests/test_bootstrap_postgres.py`; stale gap-summary expectation in `tests/test_testing_scripts.py` | None active | PostgreSQL workflow contracts and forecast/backtest coverage still pending |
 | 3 | `complete` | Scope A fixture diagnostics and marker hygiene in `tests/conftest.py`; Scope B CLI contracts for ingest/provenance paths; Scope C CLI contracts for discovery/verify/materialize paths | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute waves 3 and 4 of the global autotest plan"`; classifier runs for `tests/conftest.py` and PostgreSQL CLI files; `docker info`; `.\.venv\Scripts\python.exe -m pytest tests/test_postgres_cli_contracts.py tests/test_postgres_fixture_diagnostics.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_db_connection.py tests/test_schema_bootstrap.py tests/test_binance_ingest.py tests/test_discovery_cli.py tests/test_materialize_dataset.py tests/test_provenance.py -q -m "docker"`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs` | Resolved during scope work: new discovery contract test initially omitted timestamp columns; fixture-diagnostics test initially used the wrong `CalledProcessError` payload field | None active | Docker is still required for the PostgreSQL integration slice, but failures are now more diagnosable and isolated |
 | 4 | `complete` | Scope A `src/run_forecast.py`; Scope B `src/evaluate_forecast.py`; Scope C `src/crypto_minute_backtest.py`; Scope D Windows wrapper contracts | classifier runs for Wave 4 sources and scripts; `.\.venv\Scripts\python.exe -m pytest tests/test_run_forecast.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_evaluate_forecast.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_crypto_minute_backtest.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_script_wrappers.py -q`; `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `node scripts/precommit-checks.mjs`; audit refresh commands | Resolved during scope work: `tests/test_script_wrappers.py` exposed a real PowerShell interpolation bug in `scripts/setup_windows.ps1`; `tests/test_testing_scripts.py` still expected `src/crypto_minute_backtest.py` to appear as uncovered; `src/evaluate_forecast.py` emitted a pandas deprecation warning and was updated to avoid it | None active | Remaining direct-coverage gaps are now limited to legacy training/utilities, `configs/fine_tuning.py`, and `scripts/precommit-checks.mjs` |
-| 5 | `pending` | None | None | None | Depends on Waves 1-4 | Coverage measurement remains unavailable and explicit deferrals still need final recording |
+| 5 | `complete` | Scope A coverage/discovery/gap tooling validation; Scope B audit/baseline/inventory refresh; Scope C explicit deferral recording | `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 5 of the global autotest plan"`; `node scripts/testing/discover-test-landscape.mjs --markdown`; `node scripts/testing/measure-coverage.mjs --markdown`; `node scripts/testing/summarize-test-gaps.mjs --markdown`; `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`; `.\.venv\Scripts\python.exe -m pytest --collect-only -q`; `docker info`; `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`; `.\.venv\Scripts\python.exe -m pytest -q -m "docker"`; `node scripts/precommit-checks.mjs` | None | None active | Coverage is still advisory-unavailable, the Docker-backed PostgreSQL slice still requires Docker, and the remaining uncovered legacy surfaces are explicitly deferred |
 
 ## Wave 4 Detail
 
@@ -92,3 +92,33 @@ plan: AgentHelper/ProjectFiles/TestAutomation/GLOBAL_AUTOTEST_PLAN.md
   - None active
 - Remaining risk:
   - Docker is still required for the PostgreSQL integration slice, but the suite is now smaller, better isolated, and easier to diagnose
+
+## Wave 5 Detail
+
+- Status: `complete`
+- Completed scopes:
+  - Scope A: re-ran the discovery, coverage-status, and gap-summary tooling; confirmed existing unit coverage through `tests/test_testing_scripts.py`
+  - Scope B: refreshed `TEST_AUDIT.md`, `TEST_BASELINE.md`, and `TEST_INVENTORY.md` from live command output
+  - Scope C: recorded explicit deferrals for legacy training-oriented gaps, coverage-policy decisions, and the intentionally absent browser/E2E layer
+- Commands run:
+  - `node .codex/get-shit-done/bin/gsd-tools.cjs init quick "execute wave 5 of the global autotest plan"`
+  - `node scripts/testing/discover-test-landscape.mjs --markdown`
+  - `node scripts/testing/measure-coverage.mjs --markdown`
+  - `node scripts/testing/summarize-test-gaps.mjs --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source scripts/testing/discover-test-landscape.mjs --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source scripts/testing/measure-coverage.mjs --markdown`
+  - `node scripts/testing/classify-test-level.mjs --source scripts/testing/summarize-test-gaps.mjs --markdown`
+  - `.\.venv\Scripts\python.exe -m pytest tests/test_testing_scripts.py -q`
+  - `.\.venv\Scripts\python.exe -m pytest --collect-only -q`
+  - `docker info`
+  - `.\.venv\Scripts\python.exe -m pytest -q -m "not docker"`
+  - `.\.venv\Scripts\python.exe -m pytest -q -m "docker"`
+  - `node scripts/precommit-checks.mjs`
+- Failures encountered:
+  - None
+- Blockers:
+  - None active
+- Remaining risk:
+  - coverage measurement remains unavailable until the project explicitly supports a repo-owned coverage mechanism
+  - the Docker-backed PostgreSQL slice still depends on Docker availability
+  - the remaining direct-coverage gaps are explicitly deferred legacy surfaces rather than wave-execution failures
