@@ -1,21 +1,31 @@
 # `src/crypto_minute_backtest.py`
 
-This is the most feature-rich runtime script in the repo. It fetches Binance 1-minute candles, stores them in SQLite, runs either a rolling TimesFM backtest or a single live forecast, computes trading-style metrics, and persists both run summaries and per-window predictions.
+This is the PostgreSQL-backed crypto backtest runtime entrypoint. It reads one
+UTC day of Binance minute candles from the shared Phase 1 PostgreSQL dataset for
+historical backtests, persists live-mode Binance fetches back into PostgreSQL,
+runs rolling TimesFM forecasts, computes trading-style metrics, and stores run,
+window, and per-step prediction facts through the shared Phase 2 backtest
+helpers.
 
 Key responsibilities:
 
 - parse backtest and live-mode CLI arguments
-- fetch paginated Binance kline data over HTTP through the shared `src/binance_market_data.py` helper
-- create and maintain the SQLite schema in `candles`, `backtest_runs`, and `backtest_predictions`
+- build PostgreSQL connection settings from CLI flags and environment defaults
+- read canonical source candles from `market_data.observations` for backtests
+- fetch recent Binance klines for live mode and persist them into PostgreSQL ingestion tables
 - batch forecast windows through TimesFM for faster rolling evaluation
 - derive error metrics, directional hit rate, and return-based statistics such as annualized volatility and Sharpe ratio
+- store `market_data.backtest_runs`, `market_data.backtest_windows`, and `market_data.backtest_prediction_steps` rows through the shared helper layer
 - print run summaries and optionally export live forecasts to CSV
 
 Important interactions:
 
 - imports `directional_accuracy`, `mape`, and `smape` from `src/evaluate_forecast.py`
 - imports `DEFAULT_REPO_ID` and `build_model` from `src/run_forecast.py`
-- imports `fetch_binance_klines()`, `to_utc_iso()`, and `ONE_MINUTE_MS` from `src/binance_market_data.py`
+- imports `build_step_metrics()` from `src/backtest_metrics.py`
+- imports `create_backtest_run()`, `create_backtest_window()`, and `insert_backtest_steps()` from `src/postgres_backtest.py`
+- imports shared PostgreSQL connection and ingestion helpers from `src/postgres_dataset.py`
+- imports `fetch_binance_klines()` from `src/binance_market_data.py`
 - is launched directly or through `scripts/run_crypto_backtest.ps1`
 
 Category: data ingestion and backtesting entrypoint.
