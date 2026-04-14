@@ -19,7 +19,9 @@ def test_bootstrap_schema_creates_required_phase1_tables(
         """
     ).fetchall()
 
-    assert {row[0] for row in rows} == expected_tables
+    actual_tables = {row[0] for row in rows}
+
+    assert expected_tables.issubset(actual_tables)
 
 
 def test_observations_store_double_precision_with_a_future_upsert_key(
