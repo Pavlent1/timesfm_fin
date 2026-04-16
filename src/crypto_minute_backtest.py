@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import math
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from typing import Iterable
@@ -12,11 +11,11 @@ import psycopg
 
 from backtest_metrics import build_step_metrics
 from binance_market_data import fetch_binance_klines
-from evaluate_forecast import directional_accuracy, mape, smape
 from postgres_backtest import (
     create_backtest_run,
     create_backtest_window,
     insert_backtest_steps,
+    query_backtest_step_stats,
 )
 from postgres_dataset import (
     PostgresSettings,
@@ -30,7 +29,6 @@ from postgres_dataset import (
 from run_forecast import DEFAULT_REPO_ID, build_model
 
 
-MINUTES_PER_YEAR = 365 * 24 * 60
 DEFAULT_SOURCE_NAME = "binance"
 DEFAULT_TIMEFRAME = "1m"
 BINANCE_SOURCE_ENDPOINT = "https://api.binance.com/api/v3/klines"
@@ -86,8 +84,17 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=parse_utc_day,
         default=default_previous_utc_day(),
         help=(
-            "UTC day to backtest in YYYY-MM-DD format. "
+            "UTC start day to backtest in YYYY-MM-DD format. "
             "Default: the previous UTC day."
+        ),
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        default=1,
+        help=(
+            "How many consecutive UTC days to backtest starting at --day. "
+            "Use 1 for a single day or a larger value for multi-day runs."
         ),
     )
     parser.add_argument(
@@ -144,6 +151,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Optional CSV output path for live forecasts.",
     )
+    parser.add_argument(
+        "--output-report",
+        type=Path,
+        default=None,
+        help=(
+            "Optional text output path for backtest results. "
+            "If omitted, backtest mode writes a default report under outputs/backtests/."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -167,9 +183,11 @@ def default_previous_utc_day() -> date:
     return (datetime.now(timezone.utc) - timedelta(days=1)).date()
 
 
-def day_bounds_utc(target_day: date) -> tuple[datetime, datetime]:
+def day_bounds_utc(target_day: date, days: int = 1) -> tuple[datetime, datetime]:
+    if days < 1:
+        raise ValueError("--days must be at least 1.")
     start_dt = datetime.combine(target_day, time.min, tzinfo=timezone.utc)
-    end_dt = start_dt + timedelta(days=1)
+    end_dt = start_dt + timedelta(days=days)
     return start_dt, end_dt
 
 
@@ -239,14 +257,17 @@ def load_backtest_frame(
     *,
     symbol: str,
     target_day: date,
+    days: int,
+    context_len: int,
     source_name: str = DEFAULT_SOURCE_NAME,
     timeframe: str = DEFAULT_TIMEFRAME,
 ) -> pd.DataFrame:
-    start_dt, end_dt = day_bounds_utc(target_day)
+    start_dt, end_dt = day_bounds_utc(target_day, days=days)
+    query_start_dt = start_dt - timedelta(minutes=context_len)
     return load_frame_range(
         conn=conn,
         symbol=symbol,
-        start_dt=start_dt,
+        start_dt=query_start_dt,
         end_dt=end_dt,
         source_name=source_name,
         timeframe=timeframe,
@@ -342,50 +363,9 @@ def prepare_live_frame(
     return frame.tail(context_len).reset_index(drop=True), start_dt, end_dt
 
 
-def annual_returns(returns: pd.Series, periods_per_year: float) -> float:
-    clean_returns = returns.dropna().astype(float)
-    if clean_returns.size < 2:
-        return 0.0
-    return float(clean_returns.mean() * periods_per_year)
-
-
-def annualized_volatility(returns: pd.Series, periods_per_year: float) -> float:
-    clean_returns = returns.dropna().astype(float)
-    if clean_returns.size < 2:
-        return 0.0
-    return float(
-        np.std(clean_returns.to_numpy(dtype=np.float64))
-        * math.sqrt(periods_per_year)
-    )
-
-
-def sharpe_ratio(
-    returns: pd.Series,
-    periods_per_year: float,
-    risk_free_rate: float = 0.0,
-) -> float:
-    ann_vol = annualized_volatility(returns, periods_per_year=periods_per_year)
-    if ann_vol == 0.0:
-        return 0.0
-    ann_ret = annual_returns(returns, periods_per_year=periods_per_year)
-    return float((ann_ret - risk_free_rate) / ann_vol)
-
-
 def batched(values: list[int], batch_size: int) -> Iterable[list[int]]:
     for idx in range(0, len(values), batch_size):
         yield values[idx : idx + batch_size]
-
-
-def select_independent_returns(
-    strategy_returns: pd.Series,
-    horizon_len: int,
-    stride: int,
-) -> tuple[pd.Series, int]:
-    non_overlap_step = max(1, math.ceil(horizon_len / stride))
-    independent_returns = strategy_returns.iloc[::non_overlap_step].reset_index(
-        drop=True
-    )
-    return independent_returns, non_overlap_step
 
 
 def run_backtest(
@@ -414,11 +394,6 @@ def run_backtest(
         raise ValueError("The chosen context/horizon/stride produced zero backtest windows.")
 
     window_rows: list[dict[str, object]] = []
-    all_predictions: list[np.ndarray] = []
-    all_actuals: list[np.ndarray] = []
-    all_last_context: list[float] = []
-    all_strategy_returns: list[float] = []
-    all_direction_correct: list[int] = []
 
     for window_batch in batched(start_indices, batch_size=batch_size):
         contexts = [
@@ -432,13 +407,6 @@ def run_backtest(
             prediction = predictions_batch[batch_offset][:horizon_len]
             actual = values[start : start + horizon_len].astype(np.float64)
             last_context_close = float(values[start - 1])
-            predicted_return = float(
-                (prediction[-1] - last_context_close) / last_context_close
-            )
-            actual_return = float((actual[-1] - last_context_close) / last_context_close)
-            position = float(np.sign(predicted_return))
-            strategy_return = float(position * actual_return)
-            direction_correct = int(np.sign(predicted_return) == np.sign(actual_return))
 
             step_rows: list[dict[str, object]] = []
             for step_offset, (predicted_close, actual_close) in enumerate(
@@ -463,14 +431,12 @@ def run_backtest(
                         ],
                         "signed_deviation_pct": step_metrics["signed_deviation_pct"],
                         "overshoot_label": step_metrics["overshoot_label"],
+                        "direction_guess_correct": step_metrics[
+                            "direction_guess_correct"
+                        ],
                     }
                 )
 
-            all_predictions.append(prediction)
-            all_actuals.append(actual)
-            all_last_context.append(last_context_close)
-            all_strategy_returns.append(strategy_return)
-            all_direction_correct.append(direction_correct)
             window_rows.append(
                 {
                     "window_index": len(window_rows),
@@ -481,61 +447,9 @@ def run_backtest(
                 }
             )
 
-    predictions = np.vstack(all_predictions)
-    actuals = np.vstack(all_actuals)
-    last_context = np.asarray(all_last_context, dtype=np.float64)
-    strategy_returns = pd.Series(all_strategy_returns, dtype="float64")
-    independent_returns, non_overlap_step = select_independent_returns(
-        strategy_returns=strategy_returns,
-        horizon_len=horizon_len,
-        stride=stride,
-    )
-    effective_holding_minutes = stride * non_overlap_step
-    effective_periods_per_year = MINUTES_PER_YEAR / effective_holding_minutes
-
-    flat_predictions = predictions.reshape(-1)
-    flat_actuals = actuals.reshape(-1)
-    step1_predictions = predictions[:, 0]
-    step1_actuals = actuals[:, 0]
-    end_predictions = predictions[:, -1]
-    end_actuals = actuals[:, -1]
-
     metrics = {
         "points": int(values.size),
-        "windows": int(predictions.shape[0]),
-        "mae": float(np.mean(np.abs(flat_predictions - flat_actuals))),
-        "rmse": float(np.sqrt(np.mean((flat_predictions - flat_actuals) ** 2))),
-        "mape_pct": mape(flat_actuals, flat_predictions),
-        "smape_pct": smape(flat_actuals, flat_predictions),
-        "step1_mae": float(np.mean(np.abs(step1_predictions - step1_actuals))),
-        "step1_rmse": float(
-            np.sqrt(np.mean((step1_predictions - step1_actuals) ** 2))
-        ),
-        "step1_directional_accuracy": directional_accuracy(
-            step1_predictions,
-            step1_actuals,
-            last_context,
-        ),
-        "end_directional_accuracy": directional_accuracy(
-            end_predictions,
-            end_actuals,
-            last_context,
-        ),
-        "hit_rate": float(np.mean(np.asarray(all_direction_correct, dtype=np.float64))),
-        "strategy_mean_return": float(independent_returns.mean()),
-        "strategy_std": float(independent_returns.std(ddof=0)),
-        "annual_return": annual_returns(
-            independent_returns,
-            periods_per_year=effective_periods_per_year,
-        ),
-        "annualized_volatility": annualized_volatility(
-            independent_returns,
-            periods_per_year=effective_periods_per_year,
-        ),
-        "sharpe_ratio": sharpe_ratio(
-            independent_returns,
-            periods_per_year=effective_periods_per_year,
-        ),
+        "windows": int(len(window_rows)),
     }
     return metrics, window_rows
 
@@ -599,6 +513,62 @@ def save_backtest(
     return run_id
 
 
+def default_backtest_report_path(run_id: int) -> Path:
+    return Path("outputs") / "backtests" / f"run_{run_id}.txt"
+
+
+def render_backtest_report(
+    *,
+    args: argparse.Namespace,
+    requested_start_dt: datetime,
+    requested_end_dt: datetime,
+    loaded_candle_count: int,
+    evaluation_candle_count: int,
+    lookback_candle_count: int,
+    metrics: dict[str, float | int],
+    run_id: int,
+    step_stats_rows: list[dict[str, object]],
+) -> str:
+    lines = [
+        "TimesFM Crypto Backtest Report",
+        "",
+        f"Run id: {run_id}",
+        f"Exchange: Binance",
+        f"Symbol: {args.symbol}",
+        f"Requested UTC start: {requested_start_dt.isoformat()}",
+        f"Requested UTC end: {requested_end_dt.isoformat()}",
+        f"Requested days: {args.days}",
+        f"Context length: {args.context_len}",
+        f"Horizon length: {args.horizon_len}",
+        f"Stride: {args.stride}",
+        f"Batch size: {args.batch_size}",
+        f"Backend: {args.backend}",
+        f"Repo id: {args.repo_id}",
+        f"Frequency bucket: {args.freq}",
+        f"Loaded candles: {loaded_candle_count}",
+        f"Requested-range candles: {evaluation_candle_count}",
+        f"Context-lookback candles: {lookback_candle_count}",
+        f"Forecast windows: {int(metrics['windows'])}",
+        f"PostgreSQL: {args.host}:{args.port}/{args.db_name}",
+        "",
+        "Per-step stats (market_data.backtest_step_stats_vw)",
+    ]
+
+    if step_stats_rows:
+        stats_frame = pd.DataFrame(step_stats_rows)
+        lines.append(stats_frame.to_string(index=False))
+    else:
+        lines.append("No per-step stats found for this run.")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_backtest_report(path: Path, report_text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(report_text, encoding="utf-8")
+
+
 def build_live_forecast_table(
     frame: pd.DataFrame,
     forecast: np.ndarray,
@@ -642,57 +612,45 @@ def print_summary(
     args: argparse.Namespace,
     start_dt: datetime,
     end_dt: datetime,
-    candle_count: int,
+    loaded_candle_count: int,
+    evaluation_candle_count: int,
+    lookback_candle_count: int,
     metrics: dict[str, float | int],
     run_id: int,
+    report_path: Path,
 ) -> None:
     window_count = int(metrics["windows"])
     print("Exchange: Binance")
     print(f"Symbol: {args.symbol}")
-    print(f"UTC day: {args.day.isoformat()} ({start_dt.isoformat()} to {end_dt.isoformat()})")
-    print(f"Candles read from PostgreSQL: {candle_count}")
+    if args.days == 1:
+        print(
+            f"Requested UTC day: {args.day.isoformat()} "
+            f"({start_dt.isoformat()} to {end_dt.isoformat()})"
+        )
+    else:
+        print(
+            f"Requested UTC range: {args.day.isoformat()} + {args.days} days "
+            f"({start_dt.isoformat()} to {end_dt.isoformat()})"
+        )
+    if lookback_candle_count > 0:
+        print(
+            "Candles read from PostgreSQL: "
+            f"{loaded_candle_count} total "
+            f"({evaluation_candle_count} in requested range, "
+            f"{lookback_candle_count} context lookback)"
+        )
+    else:
+        print(f"Candles read from PostgreSQL: {loaded_candle_count}")
     print(f"Backtest run id: {run_id}")
     print("")
     if window_count == 1:
         print("Forecast windows evaluated: 1 (one forecast block)")
     else:
         print(f"Forecast windows evaluated: {window_count}")
-    print(f"Average absolute price error: {metrics['mae']:.6f}")
-    print(f"Root mean squared price error: {metrics['rmse']:.6f}")
-    print(f"Average percentage error: {metrics['mape_pct']:.6f}%")
-    print(f"Symmetric average percentage error: {metrics['smape_pct']:.6f}%")
-    print(
-        "First predicted minute got the direction right: "
-        f"{metrics['step1_directional_accuracy'] * 100.0:.2f}%"
-    )
-    print(
-        "Final predicted minute got the direction right: "
-        f"{metrics['end_directional_accuracy'] * 100.0:.2f}%"
-    )
-    print(
-        "Forecast windows with the correct overall direction: "
-        f"{metrics['hit_rate'] * 100.0:.2f}%"
-    )
-    print(
-        "Average simulated return per forecast window: "
-        f"{metrics['strategy_mean_return'] * 100.0:.4f}%"
-    )
-    print(
-        "Variation in simulated returns: "
-        f"{metrics['strategy_std'] * 100.0:.4f}%"
-    )
-    print(f"Estimated annual return: {metrics['annual_return'] * 100.0:.2f}%")
-    print(
-        "Estimated annualized volatility: "
-        f"{metrics['annualized_volatility'] * 100.0:.2f}%"
-    )
-    print(
-        "Return-to-volatility ratio: "
-        f"{metrics['sharpe_ratio']:.6f}"
-    )
     print("")
     print(f"PostgreSQL: {args.host}:{args.port}/{args.db_name}")
     print("Per-step stats view: market_data.backtest_step_stats_vw")
+    print(f"Saved report: {report_path}")
 
 
 def print_live_forecast(
@@ -752,11 +710,16 @@ def main() -> None:
             )
             return
 
-        requested_start_dt, requested_end_dt = day_bounds_utc(args.day)
+        requested_start_dt, requested_end_dt = day_bounds_utc(
+            args.day,
+            days=args.days,
+        )
         frame = load_backtest_frame(
             conn=conn,
             symbol=args.symbol,
             target_day=args.day,
+            days=args.days,
+            context_len=args.context_len,
         )
         metrics, window_rows = run_backtest(
             model=model,
@@ -768,6 +731,12 @@ def main() -> None:
             max_windows=args.max_windows,
             freq=args.freq,
         )
+        evaluation_mask = (
+            (frame["open_time_utc"] >= pd.Timestamp(requested_start_dt))
+            & (frame["open_time_utc"] < pd.Timestamp(requested_end_dt))
+        )
+        evaluation_candle_count = int(evaluation_mask.sum())
+        lookback_candle_count = len(frame) - evaluation_candle_count
         coverage_start_dt = pd.Timestamp(frame["open_time_utc"].iloc[0]).to_pydatetime()
         coverage_end_dt = pd.Timestamp(frame["open_time_utc"].iloc[-1]).to_pydatetime()
         run_id = save_backtest(
@@ -778,15 +747,32 @@ def main() -> None:
             metrics=metrics,
             window_rows=window_rows,
         )
+        report_path = args.output_report or default_backtest_report_path(run_id)
+        step_stats_rows = query_backtest_step_stats(conn=conn, run_id=run_id)
+        report_text = render_backtest_report(
+            args=args,
+            requested_start_dt=requested_start_dt,
+            requested_end_dt=requested_end_dt,
+            loaded_candle_count=len(frame),
+            evaluation_candle_count=evaluation_candle_count,
+            lookback_candle_count=lookback_candle_count,
+            metrics=metrics,
+            run_id=run_id,
+            step_stats_rows=step_stats_rows,
+        )
+        write_backtest_report(report_path, report_text)
         conn.commit()
 
         print_summary(
             args=args,
             start_dt=requested_start_dt,
             end_dt=requested_end_dt,
-            candle_count=len(frame),
+            loaded_candle_count=len(frame),
+            evaluation_candle_count=evaluation_candle_count,
+            lookback_candle_count=lookback_candle_count,
             metrics=metrics,
             run_id=run_id,
+            report_path=report_path,
         )
 
 

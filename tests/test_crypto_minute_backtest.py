@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -128,10 +129,71 @@ def test_load_backtest_frame_reads_requested_day_from_phase1_postgres(
         conn=conn,
         symbol="BTCUSDT",
         target_day=date(2024, 4, 1),
+        days=1,
+        context_len=0,
     )
 
     assert frame["close"].tolist() == [70010.0, 70050.0, 70090.0]
     assert frame["open_time_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist() == [
+        "2024-04-01T00:00:00Z",
+        "2024-04-01T00:01:00Z",
+        "2024-04-01T00:02:00Z",
+    ]
+
+
+def test_load_backtest_frame_includes_context_lookback_for_requested_day(
+    bootstrapped_postgres_connection,
+    dataset_factory,
+) -> None:
+    conn = bootstrapped_postgres_connection
+    series_id = dataset_factory.ensure_series(
+        symbol="BTCUSDT",
+        source_name="binance",
+        timeframe="1m",
+    )
+    ingestion_run_id = dataset_factory.create_ingestion_run(
+        series_id=series_id,
+        requested_start_utc=datetime(2024, 3, 31, 23, 58, tzinfo=timezone.utc),
+        requested_end_utc=datetime(2024, 4, 1, 0, 3, tzinfo=timezone.utc),
+        rows_written=5,
+        status="completed",
+    )
+    with conn.cursor() as cur:
+        cur.executemany(
+            """
+            INSERT INTO market_data.observations (
+                series_id,
+                observation_time_utc,
+                close_price,
+                ingestion_run_id
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            [
+                (series_id, timestamp, close_price, ingestion_run_id)
+                for timestamp, close_price in [
+                    (datetime(2024, 3, 31, 23, 58, tzinfo=timezone.utc), 69990.0),
+                    (datetime(2024, 3, 31, 23, 59, tzinfo=timezone.utc), 70000.0),
+                    (datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc), 70010.0),
+                    (datetime(2024, 4, 1, 0, 1, tzinfo=timezone.utc), 70050.0),
+                    (datetime(2024, 4, 1, 0, 2, tzinfo=timezone.utc), 70090.0),
+                ]
+            ],
+        )
+    conn.commit()
+
+    frame = crypto_minute_backtest.load_backtest_frame(
+        conn=conn,
+        symbol="BTCUSDT",
+        target_day=date(2024, 4, 1),
+        days=1,
+        context_len=2,
+    )
+
+    assert frame["close"].tolist() == [69990.0, 70000.0, 70010.0, 70050.0, 70090.0]
+    assert frame["open_time_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ").tolist() == [
+        "2024-03-31T23:58:00Z",
+        "2024-03-31T23:59:00Z",
         "2024-04-01T00:00:00Z",
         "2024-04-01T00:01:00Z",
         "2024-04-01T00:02:00Z",
@@ -213,11 +275,6 @@ def test_run_backtest_returns_metrics_and_window_step_records() -> None:
 
     assert metrics["points"] == 10
     assert metrics["windows"] == 3
-    assert metrics["mae"] == 0.0
-    assert metrics["rmse"] == 0.0
-    assert metrics["hit_rate"] == 1.0
-    assert metrics["step1_directional_accuracy"] == 1.0
-    assert metrics["end_directional_accuracy"] == 1.0
     assert len(window_rows) == 3
 
     first_window = window_rows[0]
@@ -234,6 +291,7 @@ def test_run_backtest_returns_metrics_and_window_step_records() -> None:
         "normalized_deviation_pct": 0.0,
         "signed_deviation_pct": 0.0,
         "overshoot_label": "match",
+        "direction_guess_correct": 1,
     }
     assert first_window["steps"][1]["target_time_utc"] == pd.Timestamp(
         "2024-04-01T00:05:00Z"
@@ -369,6 +427,7 @@ def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> No
     args = argparse.Namespace(
         mode="backtest",
         day=date(2024, 4, 1),
+        days=1,
         symbol="BTCUSDT",
         context_len=4,
         horizon_len=2,
@@ -384,6 +443,7 @@ def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> No
         user="timesfm",
         password="timesfm_dev",
         output_csv=None,
+        output_report=None,
     )
     observed: dict[str, object] = {}
 
@@ -430,18 +490,33 @@ def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> No
         return 42
 
     monkeypatch.setattr(crypto_minute_backtest, "save_backtest", fake_save_backtest)
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "query_backtest_step_stats",
+        lambda **kwargs: [],
+    )
+    monkeypatch.setattr(
+        crypto_minute_backtest,
+        "write_backtest_report",
+        lambda path, report_text: observed.update(
+            {"report_path": path, "report_text": report_text}
+        ),
+    )
     monkeypatch.setattr(crypto_minute_backtest, "print_summary", lambda **kwargs: None)
 
     crypto_minute_backtest.main()
 
     assert observed["start_dt"] == datetime(2024, 4, 1, 12, 0, tzinfo=timezone.utc)
     assert observed["end_dt"] == datetime(2024, 4, 1, 12, 6, tzinfo=timezone.utc)
+    assert observed["report_path"] == Path("outputs/backtests/run_42.txt")
+    assert "Run id: 42" in observed["report_text"]
     assert observed["committed"] is True
 
 
 def test_print_summary_uses_human_readable_metric_labels(capsys) -> None:
     args = argparse.Namespace(
         day=date(2024, 4, 1),
+        days=1,
         symbol="BTCUSDT",
         host="127.0.0.1",
         port=54329,
@@ -449,45 +524,92 @@ def test_print_summary_uses_human_readable_metric_labels(capsys) -> None:
     )
     metrics = {
         "windows": 1,
-        "mae": 33.574140625001746,
-        "rmse": 38.27004199860898,
-        "mape_pct": 0.047196569994895646,
-        "smape_pct": 0.0471868454945735,
-        "step1_directional_accuracy": 1.0,
-        "end_directional_accuracy": 0.0,
-        "hit_rate": 0.0,
-        "strategy_mean_return": 0.00123456,
-        "strategy_std": 0.00234567,
-        "annual_return": 0.123456,
-        "annualized_volatility": 0.234567,
-        "sharpe_ratio": 0.526315,
     }
 
     crypto_minute_backtest.print_summary(
         args=args,
         start_dt=datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc),
         end_dt=datetime(2024, 4, 1, 23, 59, tzinfo=timezone.utc),
-        candle_count=1440,
+        loaded_candle_count=1952,
+        evaluation_candle_count=1440,
+        lookback_candle_count=512,
         metrics=metrics,
         run_id=7,
+        report_path=Path("outputs/backtests/run_7.txt"),
     )
 
     output = capsys.readouterr().out
 
+    assert "Requested UTC day: 2024-04-01" in output
+    assert "Candles read from PostgreSQL: 1952 total (1440 in requested range, 512 context lookback)" in output
     assert "Forecast windows evaluated: 1 (one forecast block)" in output
-    assert "Average absolute price error: 33.574141" in output
-    assert "Root mean squared price error: 38.270042" in output
-    assert "Average percentage error: 0.047197%" in output
-    assert "Symmetric average percentage error: 0.047187%" in output
-    assert "First predicted minute got the direction right: 100.00%" in output
-    assert "Final predicted minute got the direction right: 0.00%" in output
-    assert "Forecast windows with the correct overall direction: 0.00%" in output
-    assert "Average simulated return per forecast window: 0.1235%" in output
-    assert "Variation in simulated returns: 0.2346%" in output
-    assert "Estimated annual return: 12.35%" in output
-    assert "Estimated annualized volatility: 23.46%" in output
-    assert "Return-to-volatility ratio: 0.526315" in output
+    assert "Saved report: outputs\\backtests\\run_7.txt" in output
     assert "MAE:" not in output
     assert "RMSE:" not in output
     assert "MAPE (%):" not in output
     assert "SMAPE (%):" not in output
+    assert "Average absolute price error:" not in output
+    assert "Root mean squared price error:" not in output
+    assert "Average percentage error:" not in output
+    assert "Symmetric average percentage error:" not in output
+    assert "First predicted minute got the direction right:" not in output
+    assert "Final predicted minute got the direction right:" not in output
+    assert "Forecast windows with the correct overall direction:" not in output
+    assert "Average simulated return per forecast window:" not in output
+    assert "Variation in simulated returns:" not in output
+    assert "Estimated annual return:" not in output
+    assert "Estimated annualized volatility:" not in output
+    assert "Return-to-volatility ratio:" not in output
+
+
+def test_render_backtest_report_includes_step_stats_table() -> None:
+    args = argparse.Namespace(
+        symbol="BTCUSDT",
+        day=date(2024, 4, 1),
+        days=2,
+        context_len=512,
+        horizon_len=5,
+        stride=5,
+        batch_size=64,
+        backend="gpu",
+        repo_id="stub/repo",
+        freq=0,
+        host="127.0.0.1",
+        port=54329,
+        db_name="timesfm_fin",
+    )
+    report = crypto_minute_backtest.render_backtest_report(
+        args=args,
+        requested_start_dt=datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc),
+        requested_end_dt=datetime(2024, 4, 3, 0, 0, tzinfo=timezone.utc),
+        loaded_candle_count=3392,
+        evaluation_candle_count=2880,
+        lookback_candle_count=512,
+        metrics={"points": 3392, "windows": 576},
+        run_id=99,
+        step_stats_rows=[
+            {
+                "run_id": 99,
+                "step_index": 0,
+                "step_count": 576,
+                "avg_normalized_deviation_pct": 0.12,
+                "stddev_normalized_deviation_pct": 0.03,
+                "avg_overshoot_deviation_pct": 0.09,
+                "avg_undershoot_deviation_pct": 0.15,
+                "match_count": 6,
+                "avg_signed_deviation_pct": 0.01,
+                "direction_guess_accuracy_pct": 58.2,
+            }
+        ],
+    )
+
+    assert "TimesFM Crypto Backtest Report" in report
+    assert "Run id: 99" in report
+    assert "Requested days: 2" in report
+    assert "Forecast windows: 576" in report
+    assert "Per-step stats (market_data.backtest_step_stats_vw)" in report
+    assert "avg_normalized_deviation_pct" in report
+    assert "avg_overshoot_deviation_pct" in report
+    assert "avg_undershoot_deviation_pct" in report
+    assert "direction_guess_accuracy_pct" in report
+    assert "0.12" in report

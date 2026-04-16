@@ -229,9 +229,10 @@ def test_backtest_step_stats_view_exposes_grouped_stats_for_one_run(
     assert step_zero["step_count"] == 2
     assert math.isclose(step_zero["avg_normalized_deviation_pct"], 2.0)
     assert math.isclose(step_zero["stddev_normalized_deviation_pct"], 1.0)
-    assert step_zero["overshoot_count"] == 1
-    assert step_zero["undershoot_count"] == 1
+    assert math.isclose(step_zero["avg_overshoot_deviation_pct"], 1.0)
+    assert math.isclose(step_zero["avg_undershoot_deviation_pct"], 3.0)
     assert math.isclose(step_zero["avg_signed_deviation_pct"], -1.0)
+    assert math.isclose(step_zero["direction_guess_accuracy_pct"], 50.0)
 
     step_one = stats_rows[1]
     assert step_one["run_id"] == run_id
@@ -239,9 +240,10 @@ def test_backtest_step_stats_view_exposes_grouped_stats_for_one_run(
     assert step_one["step_count"] == 2
     assert math.isclose(step_one["avg_normalized_deviation_pct"], 3.0)
     assert math.isclose(step_one["stddev_normalized_deviation_pct"], 1.0)
-    assert step_one["overshoot_count"] == 1
-    assert step_one["undershoot_count"] == 1
+    assert math.isclose(step_one["avg_overshoot_deviation_pct"], 2.0)
+    assert math.isclose(step_one["avg_undershoot_deviation_pct"], 4.0)
     assert math.isclose(step_one["avg_signed_deviation_pct"], -1.0)
+    assert math.isclose(step_one["direction_guess_accuracy_pct"], 50.0)
 
 
 def test_insert_backtest_steps_rejects_window_ids_from_another_run(

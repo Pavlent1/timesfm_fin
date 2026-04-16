@@ -1,0 +1,31 @@
+Crypto Prediction Strategy Backtest Report
+
+Strategy: btc_microstructure_model.evaluate_market
+Data source: Binance spot klines
+Symbol: BTCUSDT
+Requested UTC start: 2026-04-13T00:00:00+00:00
+Requested UTC end: 2026-05-13T00:00:00+00:00
+Requested days: 30
+History length: 60
+Horizon length: 5
+Synthetic market window minutes: 5
+Stride: 1
+Synthetic UP price: 0.5000
+Synthetic DOWN price: 0.5000
+Loaded candles: 4259
+Requested-range candles: 4199
+Context-lookback candles: 60
+Forecast windows: 4195
+Invalid windows skipped: 0
+
+Per-step stats
+ step_index  step_count  avg_normalized_deviation_pct  stddev_normalized_deviation_pct  overshoot_count  undershoot_count  match_count  avg_signed_deviation_pct
+          0        4195                      0.074683                         0.076917             1135              3060            0                 -0.044195
+          1        4195                      0.135681                         0.142301             1332              2863            0                 -0.063788
+          2        4195                      0.196113                         0.206262             1438              2757            0                 -0.077694
+          3        4195                      0.256050                         0.270528             1469              2726            0                 -0.092845
+          4        4195                      0.315908                         0.335046             1529              2666            0                 -0.096336
+
+Notes
+- Predicted close values are synthesized from the export's own composite signal and recent microstructure magnitude so the strategy can be scored with the same deviation metrics as the TimesFM backtest.
+- Synthetic market prices default to a neutral 50/50 snapshot. Override --up-price/--down-price if you want the strategy filters to reflect a different implied market.

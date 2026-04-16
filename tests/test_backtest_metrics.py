@@ -79,6 +79,31 @@ def test_classify_overshoot_for_downward_actual_move() -> None:
     ) == "undershoot"
 
 
+def test_direction_guess_correct_tracks_side_of_last_input_close() -> None:
+    metrics = load_metrics_module()
+
+    assert metrics.direction_guess_correct(
+        last_input_close=100.0,
+        predicted_close=112.0,
+        actual_close=110.0,
+    ) == 1
+    assert metrics.direction_guess_correct(
+        last_input_close=100.0,
+        predicted_close=88.0,
+        actual_close=90.0,
+    ) == 1
+    assert metrics.direction_guess_correct(
+        last_input_close=100.0,
+        predicted_close=112.0,
+        actual_close=90.0,
+    ) == 0
+    assert metrics.direction_guess_correct(
+        last_input_close=100.0,
+        predicted_close=100.0,
+        actual_close=100.0,
+    ) == 1
+
+
 def test_signed_deviation_pct_is_positive_for_overshoot_and_negative_for_undershoot() -> None:
     metrics = load_metrics_module()
 
@@ -122,4 +147,5 @@ def test_build_step_metrics_returns_reusable_per_step_inputs() -> None:
         "overshoot_label": "overshoot",
         "normalized_deviation_pct": pytest.approx((2.0 / 110.0) * 100.0),
         "signed_deviation_pct": pytest.approx((2.0 / 110.0) * 100.0),
+        "direction_guess_correct": 1,
     }

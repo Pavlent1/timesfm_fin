@@ -1,0 +1,23 @@
+Crypto Minute Candle Follow-up Stats Report
+
+Exchange: Binance
+Symbol: BTCUSDT
+Requested UTC start: 2025-04-20T00:00:00+00:00
+Requested UTC end: 2026-04-15T00:00:00+00:00
+Requested days: 360
+Reference candles per window: 1
+Future candles per window: 5
+Stride: 1
+Loaded candles: 518294
+Requested-range candles: 518293
+Context-lookback candles: 1
+Analysis windows: 518289
+PostgreSQL: 127.0.0.1:54329/timesfm_fin
+
+Per-step stats
+ step_ahead  step_count  above_count  below_count  match_count  above_pct  below_pct  match_pct  avg_close_difference  avg_abs_close_difference  avg_normalized_deviation_pct  stddev_normalized_deviation_pct
+          1      518289       249712       248667        19910  48.180069  47.978444   3.841486             -0.020952                 34.948199                      0.037322                         0.047618
+          2      518289       255219       255216         7854  49.242604  49.242025   1.515371             -0.041724                 50.444459                      0.053791                         0.066260
+          3      518289       256994       257070         4225  49.585077  49.599741   0.815182             -0.062558                 62.105683                      0.066195                         0.080603
+          4      518289       257353       258358         2578  49.654343  49.848251   0.497406             -0.083249                 71.924229                      0.076647                         0.092958
+          5      518289       257578       258968         1743  49.697755  49.965946   0.336299             -0.103965                 80.526349                      0.085785                         0.104027

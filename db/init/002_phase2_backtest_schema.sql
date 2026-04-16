@@ -54,16 +54,32 @@ CREATE INDEX IF NOT EXISTS idx_backtest_windows_run_id
 CREATE INDEX IF NOT EXISTS idx_backtest_steps_run_step
     ON market_data.backtest_prediction_steps (run_id, step_index);
 
-CREATE OR REPLACE VIEW market_data.backtest_step_stats_vw AS
+DROP VIEW IF EXISTS market_data.backtest_step_stats_vw;
+
+CREATE VIEW market_data.backtest_step_stats_vw AS
 SELECT
     run_id,
     step_index,
     COUNT(*)::BIGINT AS step_count,
     AVG(normalized_deviation_pct)::DOUBLE PRECISION AS avg_normalized_deviation_pct,
     COALESCE(STDDEV_POP(normalized_deviation_pct), 0.0)::DOUBLE PRECISION AS stddev_normalized_deviation_pct,
-    COUNT(*) FILTER (WHERE overshoot_label = 'overshoot')::BIGINT AS overshoot_count,
-    COUNT(*) FILTER (WHERE overshoot_label = 'undershoot')::BIGINT AS undershoot_count,
+    COALESCE(
+        AVG(normalized_deviation_pct) FILTER (WHERE overshoot_label = 'overshoot'),
+        0.0
+    )::DOUBLE PRECISION AS avg_overshoot_deviation_pct,
+    COALESCE(
+        AVG(normalized_deviation_pct) FILTER (WHERE overshoot_label = 'undershoot'),
+        0.0
+    )::DOUBLE PRECISION AS avg_undershoot_deviation_pct,
     COUNT(*) FILTER (WHERE overshoot_label = 'match')::BIGINT AS match_count,
-    AVG(signed_deviation_pct)::DOUBLE PRECISION AS avg_signed_deviation_pct
+    AVG(signed_deviation_pct)::DOUBLE PRECISION AS avg_signed_deviation_pct,
+    AVG(
+        CASE
+            WHEN predicted_close > last_input_close AND actual_close > last_input_close THEN 1.0
+            WHEN predicted_close < last_input_close AND actual_close < last_input_close THEN 1.0
+            WHEN predicted_close = last_input_close AND actual_close = last_input_close THEN 1.0
+            ELSE 0.0
+        END
+    )::DOUBLE PRECISION * 100.0 AS direction_guess_accuracy_pct
 FROM market_data.backtest_prediction_steps
 GROUP BY run_id, step_index;

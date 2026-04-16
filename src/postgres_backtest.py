@@ -158,10 +158,11 @@ def query_backtest_step_stats(
                 step_count,
                 avg_normalized_deviation_pct,
                 stddev_normalized_deviation_pct,
-                overshoot_count,
-                undershoot_count,
+                avg_overshoot_deviation_pct,
+                avg_undershoot_deviation_pct,
                 match_count,
-                avg_signed_deviation_pct
+                avg_signed_deviation_pct,
+                direction_guess_accuracy_pct
             FROM market_data.backtest_step_stats_vw
             WHERE run_id = %s
             ORDER BY step_index

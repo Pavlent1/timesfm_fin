@@ -1,0 +1,28 @@
+TimesFM Crypto Backtest Report
+
+Run id: 9
+Exchange: Binance
+Symbol: BTCUSDT
+Requested UTC start: 2026-04-13T00:00:00+00:00
+Requested UTC end: 2026-04-14T00:00:00+00:00
+Requested days: 1
+Context length: 512
+Horizon length: 5
+Stride: 5
+Batch size: 64
+Backend: gpu
+Repo id: pfnet/timesfm-1.0-200m-fin
+Frequency bucket: 0
+Loaded candles: 1952
+Requested-range candles: 1440
+Context-lookback candles: 512
+Forecast windows: 1
+PostgreSQL: host.docker.internal:54329/timesfm_fin
+
+Per-step stats (market_data.backtest_step_stats_vw)
+ run_id  step_index  step_count  avg_normalized_deviation_pct  stddev_normalized_deviation_pct  overshoot_count  undershoot_count  match_count  avg_signed_deviation_pct
+      9           0           1                      0.138600                              0.0                0                 1            0                 -0.138600
+      9           1           1                      0.137985                              0.0                0                 1            0                 -0.137985
+      9           2           1                      0.201782                              0.0                0                 1            0                 -0.201782
+      9           3           1                      0.188454                              0.0                0                 1            0                 -0.188454
+      9           4           1                      0.104496                              0.0                0                 1            0                 -0.104496

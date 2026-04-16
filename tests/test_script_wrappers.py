@@ -25,6 +25,7 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
     powershell = find_powershell()
     docker_cmd = tmp_path / "docker.cmd"
     docker_log = tmp_path / "docker.log"
+    hf_cache = tmp_path / "hf-cache"
     docker_cmd.write_text(
         "@echo off\r\n"
         f">> \"{docker_log}\" echo %*\r\n"
@@ -51,6 +52,8 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
             "ETHUSDT",
             "-Day",
             "2024-04-01",
+            "-Days",
+            "3",
             "-ContextLen",
             "64",
             "-HorizonLen",
@@ -63,6 +66,8 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
             "2",
             "-MaxWindows",
             "5",
+            "-HfCacheDir",
+            str(hf_cache),
             "-OutputCsv",
             "/workspace/live.csv",
         ],
@@ -80,7 +85,10 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
     assert "--add-host host.docker.internal:host-gateway" in logged_command
     assert "-e POSTGRES_HOST=host.docker.internal" in logged_command
     assert "-e POSTGRES_PORT=54329" in logged_command
+    assert "-e HF_HOME=/root/.cache/huggingface" in logged_command
+    assert "-e HUGGINGFACE_HUB_CACHE=/root/.cache/huggingface/hub" in logged_command
     assert f"-v {REPO_ROOT}:/workspace" in logged_command
+    assert f"-v {hf_cache}:/root/.cache/huggingface" in logged_command
     assert "--entrypoint python" in logged_command
     assert "src/crypto_minute_backtest.py" in logged_command
     assert "--symbol ETHUSDT" in logged_command
@@ -91,8 +99,9 @@ def test_run_crypto_backtest_wrapper_builds_expected_docker_command(tmp_path) ->
     assert "--backend gpu" in logged_command
     assert "--freq 2" in logged_command
     assert "--day 2024-04-01" in logged_command
-    assert "--max-windows 5" in logged_command
+    assert "--days" not in logged_command
     assert "--mode live" in logged_command
+    assert "--max-windows 5" in logged_command
     assert "--output-csv /workspace/live.csv" in logged_command
     assert "--db-path" not in logged_command
 
@@ -135,7 +144,52 @@ def test_run_crypto_backtest_wrapper_defaults_to_cpu_backend(tmp_path) -> None:
     assert "--backend cpu" in logged_command
     assert "--gpus all" not in logged_command
     assert "--day 2024-04-01" in logged_command
+    assert "--days 1" in logged_command
     assert "--mode live" not in logged_command
+
+
+def test_run_crypto_backtest_wrapper_switches_to_offline_weights_when_cache_exists(
+    tmp_path,
+) -> None:
+    powershell = find_powershell()
+    docker_cmd = tmp_path / "docker.cmd"
+    docker_log = tmp_path / "docker.log"
+    hf_cache = tmp_path / "hf-cache" / "hub" / "models--pfnet--timesfm-1.0-200m-fin"
+    hf_cache.mkdir(parents=True)
+    docker_cmd.write_text(
+        "@echo off\r\n"
+        f">> \"{docker_log}\" echo %*\r\n"
+        "exit /b 0\r\n",
+        encoding="ascii",
+    )
+
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path};{env['PATH']}"
+
+    subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(REPO_ROOT / "scripts" / "run_crypto_backtest.ps1"),
+            "-SkipBuild",
+            "-Day",
+            "2024-04-01",
+            "-HfCacheDir",
+            str(tmp_path / "hf-cache"),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+    logged_command = docker_log.read_text(encoding="utf-8").strip()
+
+    assert "-e HF_HUB_OFFLINE=1" in logged_command
 
 
 def test_dockerfile_installs_shared_runtime_requirements_for_backtest() -> None:
@@ -144,6 +198,50 @@ def test_dockerfile_installs_shared_runtime_requirements_for_backtest() -> None:
     assert "COPY requirements.inference.txt /workspace/requirements.inference.txt" in dockerfile
     assert '"timesfm[pax]==1.3.0"' in dockerfile
     assert "-r /workspace/requirements.inference.txt" in dockerfile
+
+
+def test_run_crypto_backtest_preset_uses_gpu_no_build_and_five_step_defaults(tmp_path) -> None:
+    powershell = find_powershell()
+    docker_cmd = tmp_path / "docker.cmd"
+    docker_log = tmp_path / "docker.log"
+    docker_cmd.write_text(
+        "@echo off\r\n"
+        f">> \"{docker_log}\" echo %*\r\n"
+        "exit /b 0\r\n",
+        encoding="ascii",
+    )
+
+    env = os.environ.copy()
+    env["PATH"] = f"{tmp_path};{env['PATH']}"
+    env["USERPROFILE"] = str(tmp_path)
+
+    subprocess.run(
+        [
+            powershell,
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(REPO_ROOT / "scripts" / "run_crypto_backtest_preset.ps1"),
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=True,
+    )
+
+    logged_command = docker_log.read_text(encoding="utf-8").strip()
+
+    assert "build" not in logged_command
+    assert "run --rm --gpus all" in logged_command
+    assert "--day 2026-04-13" in logged_command
+    assert "--days 1" in logged_command
+    assert "--context-len 512" in logged_command
+    assert "--horizon-len 5" in logged_command
+    assert "--stride 5" in logged_command
+    assert "--batch-size 64" in logged_command
+    assert "--backend gpu" in logged_command
 
 
 def test_setup_windows_script_rejects_non_310_python(tmp_path) -> None:
