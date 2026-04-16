@@ -236,6 +236,52 @@ Logs, tensorboard data and checkpoints will be stored in `workdir`.
 | Layers                         | 20                                |
 | Hidden dimensions              | 1280                              |
 
+## Phase 3 manual training workflow
+
+Phase 3 adds a reproducible wrapper around the legacy trainer so manual runs can
+point back to an explicit prepared bundle, parent checkpoint, copied config, and
+post-train holdout summaries.
+
+1. Prepare a PostgreSQL-backed training bundle:
+
+```bash
+python src/postgres_prepare_training.py --manifest outputs/training_manifest.json --output-dir outputs/prepared_bundle
+```
+
+2. Launch a manual run from that prepared bundle with an explicit parent checkpoint:
+
+```bash
+python src/train_from_postgres.py --bundle-dir outputs/prepared_bundle --output-root outputs/training_runs --parent-checkpoint pfnet/timesfm-1.0-200m-fin --run-name starter-run
+```
+
+This writes a deterministic run bundle under `outputs/training_runs/runs/<run-name>/`
+with:
+
+- `run_manifest.json`
+- copied `inputs/fine_tuning.py` with a bundle-compatible batch size
+- `environment_snapshot.json`
+- `evaluation_summary.json`
+- `backtest_summary.json`
+
+The wrapper keeps the workflow manual-only and treats the trainer's internal
+shuffle eval as non-canonical. Use the explicit holdout outputs above for later
+comparison.
+
+3. Compare two or more completed run bundles:
+
+```bash
+python src/compare_training_runs.py --run-dir outputs/training_runs/runs/run-a --run-dir outputs/training_runs/runs/run-b --output-dir outputs/training_runs/comparison
+```
+
+This writes:
+
+- `comparison_summary.json`
+- `comparison_summary.md`
+
+The comparison step makes parent checkpoint, prepared-bundle identity, holdout
+ranges, evaluation summaries, and referenced `backtest_run_id` values visible in
+one report instead of comparing anonymous checkpoint folders by hand.
+
 ## Mock trading
 We provide our mock trading script and notebook used in calculating several evaluation metrics. To run the mock trading script, use the following command 
 
