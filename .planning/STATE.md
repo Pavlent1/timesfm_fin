@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-04-16T13:57:04.941Z"
-last_activity: 2026-04-16
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-04-16T14:02:32.194Z"
+last_activity: 2026-04-16 -- Completed 03-03 and paused before 03-04
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 12
-  completed_plans: 9
-  percent: 75
+  completed_plans: 10
+  percent: 83
 ---
 
 # Project State
@@ -21,39 +21,42 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-13)
 
 **Core value:** Users can run reproducible financial forecasting and backtesting workflows with the supported TimesFM finance checkpoint and clearly understand what is and is not supported.
-**Current focus:** Phase 03 — train-the-model-on-1-minute-crypto-candles
+**Current focus:** Phase 03 - train-the-model-on-1-minute-crypto-candles
 
 ## Current Position
 
-Phase: 03 (train-the-model-on-1-minute-crypto-candles) — EXECUTING
-Plan: 2 of 5
-Status: Ready to execute
-Last activity: 2026-04-16
+Phase: 03 (train-the-model-on-1-minute-crypto-candles) - EXECUTING
+Plan: 4 of 5
+Status: Paused pending user confirmation
+Last activity: 2026-04-16 -- Completed 03-03 and paused before 03-04
 
-Progress: [███████░░░] 71%
+Progress: [████████░░] 83%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
-- Average duration: ~15 min
-- Total execution time: ~1.0 hours
+- Total plans completed: 10
+- Average duration: ~12 min
+- Total execution time: ~2.0 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 4 | ~1.0h | ~15m |
+| 03 | 3 | ~14m | ~5m |
 
 **Recent Trend:**
 
-- Last 5 plans: 01-01, 01-02, 01-03, 01-04, 02-01
-- Trend: Phase 2 execution is in progress with 1 of 3 plans complete
+- Last 4 plans: 03-01, 03-02, 03-03
+- Trend: Phase 3 is in progress with 3 of 5 plans complete and execution paused before 03-04
 
 | Phase 02 P01 | 8m | 2 tasks | 5 files |
 | Phase 02 P02 | 5m | 3 tasks | 8 files |
+| Phase 03 P01 | 7 min | 3 tasks | 8 files |
 | Phase 03 P02 | 4 min | 3 tasks | 6 files |
+| Phase 03 P03 | 3 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -65,9 +68,9 @@ Recent decisions affecting current work:
 - [Phase 0]: Keep the current TimesFM v1 compatibility target and harden the existing toolkit first.
 - [Phase 0]: Prioritize reproducibility, validation, and trust over new product surface.
 - [Phase 02]: Locked Phase 2 backtest metric semantics in src/backtest_metrics.py before persistence or runtime migration reuses them.
-- [Phase 02]: Phase 2 metric contract tests import the subject lazily so collect-only verification stays green before implementation exists.
-- [Phase 02]: Bootstrap now treats checked-in db/init SQL files as an ordered schema set applied lexically.
-- [Phase 02]: Backtest PostgreSQL helpers return generated IDs and keep transaction control with callers.
+- [Phase 03]: Reuse src/postgres_ingest_binance.py as the only Binance-to-PostgreSQL write path for source readiness.
+- [Phase 03]: Use manifest-first training bundles with explicit holdout artifacts instead of overloading the older aligned matrix export.
+- [Phase 03]: Freeze the intended manual training stack in requirements.training.txt and capture run-environment facts as JSON.
 
 ### Pending Todos
 
@@ -79,10 +82,11 @@ None yet.
 - Phase 2 added: Create backtest architecture, qualification rules, and statistics collection
 - Phase 3 added: Train the model on 1-minute crypto candles
 - Phase 1 completed: PostgreSQL data foundation, ingestion, discovery, verification, and CSV bridge are now in the repo
+- Phase 3 progress: 03-01 through 03-03 are complete; 03-04 is next
 
 ### Blockers/Concerns
 
-- Phase 2 execution still depends on implementing the PostgreSQL-backed runtime, schema, and docs defined in the new plans.
+- Execution is intentionally paused after 03-03 and awaiting user confirmation before 03-04 starts.
 
 ### Quick Tasks Completed
 
@@ -98,6 +102,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-16T13:57:04.937Z
-Stopped at: Completed 03-02-PLAN.md
-Resume file: .planning/phases/03-train-the-model-on-1-minute-crypto-candles/03-03-PLAN.md
+Last session: 2026-04-16T14:02:32.189Z
+Stopped at: Completed 03-03-PLAN.md
+Resume file: .planning/phases/03-train-the-model-on-1-minute-crypto-candles/03-04-PLAN.md
