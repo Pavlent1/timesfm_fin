@@ -68,7 +68,7 @@ Phases execute in numeric order: 1 -> 2
 **Plans:** 5 plans
 
 Plans:
-- [ ] 03-01-PLAN.md - Prepare and verify Phase 3 PostgreSQL source coverage for BTCUSDT, ETHUSDT, and SOLUSDT
+- [x] 03-01-PLAN.md - Prepare and verify Phase 3 PostgreSQL source coverage for BTCUSDT, ETHUSDT, and SOLUSDT
 - [ ] 03-02-PLAN.md - Materialize manifest-driven cleaned training bundles with explicit holdouts
 - [ ] 03-03-PLAN.md - Freeze the manual training environment and capture reproducibility metadata
 - [ ] 03-04-PLAN.md - Wrap the legacy trainer and emit canonical post-train evaluation/backtest summaries
