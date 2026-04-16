@@ -9,6 +9,9 @@ from postgres_dataset import connect_postgres, load_postgres_settings
 from postgres_discover_data import fetch_dataframe, parse_utc_datetime
 
 
+DEFAULT_REPAIRABLE_GAP_MINUTES = 5
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     defaults = load_postgres_settings()
     parser = argparse.ArgumentParser(
@@ -77,6 +80,99 @@ def load_observations(
     return frame
 
 
+def build_series_details(
+    frame: pd.DataFrame,
+    *,
+    repairable_gap_minutes: int = DEFAULT_REPAIRABLE_GAP_MINUTES,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    if frame.empty:
+        return [], []
+
+    series_details: list[dict[str, object]] = []
+    blocking_findings: list[dict[str, object]] = []
+
+    for (_, source_name, asset_symbol, series_timeframe), group in frame.groupby(
+        ["series_id", "source_name", "symbol", "timeframe"],
+        sort=True,
+    ):
+        timestamps = group["observation_time_utc"].reset_index(drop=True)
+        segments: list[dict[str, object]] = []
+        gaps: list[dict[str, object]] = []
+
+        segment_start_index = 0
+        for index in range(1, len(timestamps)):
+            delta = timestamps.iloc[index] - timestamps.iloc[index - 1]
+            if delta <= pd.Timedelta(minutes=1):
+                continue
+
+            segment = timestamps.iloc[segment_start_index:index]
+            segments.append(
+                {
+                    "start_utc": segment.iloc[0],
+                    "end_utc": segment.iloc[-1],
+                    "row_count": int(len(segment)),
+                }
+            )
+            missing_minutes = int(delta / pd.Timedelta(minutes=1)) - 1
+            severity = (
+                "repairable"
+                if missing_minutes <= repairable_gap_minutes
+                else "blocking"
+            )
+            gap = {
+                "start_utc": timestamps.iloc[index - 1],
+                "end_utc": timestamps.iloc[index],
+                "missing_minutes": missing_minutes,
+                "severity": severity,
+            }
+            gaps.append(gap)
+            if severity == "blocking":
+                blocking_findings.append(
+                    {
+                        "symbol": asset_symbol,
+                        "kind": "blocking_gap",
+                        "message": (
+                            f"{asset_symbol} has a blocking gap of {missing_minutes} "
+                            "missing minute candles."
+                        ),
+                        "gap": gap,
+                    }
+                )
+            segment_start_index = index
+
+        final_segment = timestamps.iloc[segment_start_index:]
+        segments.append(
+            {
+                "start_utc": final_segment.iloc[0],
+                "end_utc": final_segment.iloc[-1],
+                "row_count": int(len(final_segment)),
+            }
+        )
+
+        series_details.append(
+            {
+                "source_name": source_name,
+                "symbol": asset_symbol,
+                "timeframe": series_timeframe,
+                "row_count": int(len(group)),
+                "data_start_utc": timestamps.iloc[0],
+                "data_end_utc": timestamps.iloc[-1],
+                "coverage_state": "contiguous" if not gaps else "segmented",
+                "segment_count": len(segments),
+                "segments": segments,
+                "gaps": gaps,
+                "blocking_gap_count": sum(
+                    1 for gap in gaps if gap["severity"] == "blocking"
+                ),
+                "repairable_gap_count": sum(
+                    1 for gap in gaps if gap["severity"] == "repairable"
+                ),
+            }
+        )
+
+    return series_details, blocking_findings
+
+
 def build_integrity_report(
     conn,
     *,
@@ -140,6 +236,7 @@ def build_integrity_report(
     coverage = pd.DataFrame(coverage_rows).sort_values(
         ["source_name", "symbol", "timeframe"]
     ).reset_index(drop=True)
+    series_details, blocking_findings = build_series_details(frame)
 
     return {
         "issue_counts": {
@@ -150,6 +247,8 @@ def build_integrity_report(
             "out_of_range_timestamps": out_of_range_timestamps,
         },
         "coverage": coverage,
+        "series_details": series_details,
+        "blocking_findings": blocking_findings,
     }
 
 
@@ -173,6 +272,16 @@ def render_integrity_report(report: dict[str, object]) -> str:
     lines.append("")
     lines.append("Coverage summary:")
     lines.append(display.to_string(index=False))
+    series_details = report.get("series_details", [])
+    if series_details:
+        lines.append("")
+        lines.append("Segment summary:")
+        for detail in series_details:
+            lines.append(
+                f"- {detail['symbol']}: {detail['coverage_state']}, "
+                f"segments={detail['segment_count']}, "
+                f"blocking_gaps={detail['blocking_gap_count']}"
+            )
     return "\n".join(lines)
 
 
