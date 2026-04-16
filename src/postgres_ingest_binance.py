@@ -65,6 +65,28 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def build_ingest_args(
+    base_args: argparse.Namespace,
+    *,
+    symbol: str,
+    start: datetime,
+    end: datetime,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        host=base_args.host,
+        port=base_args.port,
+        db_name=base_args.db_name,
+        user=base_args.user,
+        password=base_args.password,
+        source_name=base_args.source_name,
+        symbol=symbol,
+        timeframe=base_args.timeframe,
+        days=getattr(base_args, "days", 365),
+        start=start,
+        end=end,
+    )
+
+
 def normalize_close_observations(rows: list[list]) -> list[tuple[datetime, float]]:
     return [
         (
