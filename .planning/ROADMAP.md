@@ -59,3 +59,16 @@ Phases execute in numeric order: 1 -> 2
 |-------|----------------|--------|-----------|
 | 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |
 | 2. Create backtest architecture, qualification rules, and statistics collection | 1/3 | In Progress | - |
+
+### Phase 3: Train the model on 1-minute crypto candles
+
+**Goal:** Establish a repeatable manual TimesFM v1 fine-tuning workflow from PostgreSQL-backed 1-minute crypto candles with explicit preparation, checkpoint lineage, and comparison-ready reporting.
+**Requirements**: [MODEL-01, MODEL-02, OPS-01]
+**Depends on:** Phase 2
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md - Prepare and verify Phase 3 PostgreSQL source coverage for BTCUSDT, ETHUSDT, and SOLUSDT
+- [ ] 03-02-PLAN.md - Materialize manifest-driven cleaned training bundles with explicit holdouts
+- [ ] 03-03-PLAN.md - Freeze the manual training environment and wrap the legacy trainer with explicit parent capture
+- [ ] 03-04-PLAN.md - Generate lineage, evaluation/backtest summaries, and cross-run comparison reports

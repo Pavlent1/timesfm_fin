@@ -42,7 +42,8 @@ def test_summarize_test_gaps_highlights_known_missing_coverage() -> None:
     assert "`src/binance_market_data.py`" not in output
     assert "`src/bootstrap_postgres.py`" not in output
     assert "`src/crypto_minute_backtest.py`" not in output
-    assert "`src/evaluation.py`" in output
+    assert "`src/evaluation.py`" not in output
+    assert "`src/train_flax.py`" in output
 
 
 def test_find_affected_tests_reports_markdown_output() -> None:
