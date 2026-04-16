@@ -20,6 +20,8 @@ flags.DEFINE_string('workdir', None, 'Directory to store model data.')
 flags.DEFINE_string('dataset_path', None, 'Path to training/test dataset')
 flags.DEFINE_bool('do_eval', False, 'Evaluation mode.')
 flags.DEFINE_string('checkpoint_path', None, 'Path to checkpoint.')
+flags.DEFINE_string('checkpoint_repo_id', None, 'Hugging Face repo id for the parent checkpoint.')
+flags.DEFINE_enum('backend', 'gpu', ['cpu', 'gpu', 'tpu'], 'Backend for TimesFM runtime.')
 
 config_flags.DEFINE_config_file(
     'config',
@@ -33,6 +35,7 @@ def main(argv):
   workdir = FLAGS.workdir
   do_eval = FLAGS.do_eval
   checkpoint_path = FLAGS.checkpoint_path
+  checkpoint_repo_id = FLAGS.checkpoint_repo_id
   config.dataset_path = FLAGS.dataset_path
 
   hparams = timesfm.TimesFmHparams(
@@ -42,13 +45,18 @@ def main(argv):
     output_patch_len=128, # this is set to the same as horizon length during training
     num_layers=20,
     model_dims=1280,
-    backend='gpu'
+    backend=FLAGS.backend
   )
 
   if checkpoint_path is not None:
     checkpoint = timesfm.TimesFmCheckpoint(
       version='jax',
       path=checkpoint_path,
+    )
+  elif checkpoint_repo_id is not None:
+    checkpoint = timesfm.TimesFmCheckpoint(
+      version='jax',
+      huggingface_repo_id=checkpoint_repo_id,
     )
   else:
     checkpoint = timesfm.TimesFmCheckpoint(
