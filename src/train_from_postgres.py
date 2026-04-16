@@ -16,6 +16,11 @@ from training_environment import (
     file_sha256,
     write_environment_snapshot,
 )
+from training_shapes import (
+    TrainingShape,
+    resolve_training_shape,
+    validate_bundle_window_length,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -71,20 +76,44 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--context-len",
         type=int,
-        default=512,
-        help="Context length for the post-train holdout evaluation/backtest adapters.",
+        default=None,
+        help="Context length for the post-train holdout evaluation/backtest adapters. Defaults to the training context length.",
     )
     parser.add_argument(
         "--horizon-len",
         type=int,
-        default=128,
-        help="Horizon length for the post-train holdout evaluation/backtest adapters.",
+        default=None,
+        help="Horizon length for the post-train holdout evaluation/backtest adapters. Defaults to the effective training horizon.",
     )
     parser.add_argument(
         "--stride",
         type=int,
-        default=128,
-        help="Stride used by the post-train holdout evaluation/backtest adapters.",
+        default=None,
+        help="Stride used by the post-train holdout evaluation/backtest adapters. Defaults to the effective evaluation horizon.",
+    )
+    parser.add_argument(
+        "--training-context-len",
+        type=int,
+        default=None,
+        help="Optional override for config.context_len and config.input_len.",
+    )
+    parser.add_argument(
+        "--training-output-len",
+        type=int,
+        default=None,
+        help="Optional override for config.output_len.",
+    )
+    parser.add_argument(
+        "--training-horizon-len",
+        type=int,
+        default=None,
+        help="Optional override for config.horizon_len.",
+    )
+    parser.add_argument(
+        "--training-output-patch-len",
+        type=int,
+        default=None,
+        help="Optional override for config.output_patch_len.",
     )
     return parser.parse_args(argv)
 
@@ -148,11 +177,79 @@ def classify_parent_checkpoint(parent_checkpoint: str | None) -> dict[str, str]:
     return {"kind": "repo", "value": parent_checkpoint}
 
 
-def extract_config_batch_size(config_text: str) -> int:
-    match = re.search(r"config\.batch_size\s*=\s*([0-9_ *()+-]+)", config_text)
-    if match is None:
-        raise ValueError("Could not find config.batch_size in the training config.")
-    return int(eval(match.group(1), {"__builtins__": {}}, {}))
+def evaluate_config_expression(expression: str) -> int:
+    return int(eval(expression.strip(), {"__builtins__": {}}, {}))
+
+
+def extract_config_value(
+    config_text: str,
+    key: str,
+    *,
+    default: int | None = None,
+) -> int:
+    match = re.search(rf"config\.{re.escape(key)}\s*=\s*([^\n#]+)", config_text)
+    if match is not None:
+        return evaluate_config_expression(match.group(1))
+    if default is not None:
+        return default
+    raise ValueError(f"Could not find config.{key} in the training config.")
+
+
+def extract_config_settings(config_text: str) -> dict[str, int]:
+    combined_context_match = re.search(
+        r"config\.context_len\s*=\s*config\.input_len\s*=\s*([^\n#]+)",
+        config_text,
+    )
+    if combined_context_match is not None:
+        context_len = evaluate_config_expression(combined_context_match.group(1))
+        input_len = context_len
+    else:
+        context_len = extract_config_value(config_text, "context_len")
+        input_len = extract_config_value(config_text, "input_len", default=context_len)
+
+    return {
+        "context_len": context_len,
+        "input_len": input_len,
+        "output_len": extract_config_value(config_text, "output_len"),
+        "horizon_len": extract_config_value(config_text, "horizon_len"),
+        "output_patch_len": extract_config_value(config_text, "output_patch_len", default=128),
+        "batch_size": extract_config_value(config_text, "batch_size"),
+    }
+
+
+def build_training_shape_overrides(
+    *,
+    training_context_len: int | None,
+    training_output_len: int | None,
+    training_horizon_len: int | None,
+    training_output_patch_len: int | None,
+) -> dict[str, int | None]:
+    return {
+        "context_len": training_context_len,
+        "input_len": training_context_len,
+        "output_len": training_output_len,
+        "horizon_len": training_horizon_len,
+        "output_patch_len": training_output_patch_len,
+    }
+
+
+def resolve_effective_training_shape(
+    *,
+    config_path: Path,
+    training_context_len: int | None,
+    training_output_len: int | None,
+    training_horizon_len: int | None,
+    training_output_patch_len: int | None,
+) -> tuple[dict[str, int], TrainingShape]:
+    config_text = config_path.read_text(encoding="utf-8")
+    config_settings = extract_config_settings(config_text)
+    overrides = build_training_shape_overrides(
+        training_context_len=training_context_len,
+        training_output_len=training_output_len,
+        training_horizon_len=training_horizon_len,
+        training_output_patch_len=training_output_patch_len,
+    )
+    return config_settings, resolve_training_shape(config_settings, overrides=overrides)
 
 
 def derive_compatible_batch_size(
@@ -179,21 +276,33 @@ def derive_compatible_batch_size(
     raise ValueError("Unable to derive a compatible batch size from the prepared bundle.")
 
 
-def copy_config_with_batch_size(
+def copy_config_with_overrides(
     *,
     source_path: Path,
     destination_path: Path,
     batch_size: int,
+    training_shape: TrainingShape,
 ) -> None:
     source_text = source_path.read_text(encoding="utf-8")
+    override_block = "\n".join(
+        [
+            "  # Applied by train_from_postgres.py for the effective run configuration.",
+            f"  config.context_len = {training_shape.context_len}",
+            f"  config.input_len = {training_shape.input_len}",
+            f"  config.output_len = {training_shape.output_len}",
+            f"  config.horizon_len = {training_shape.horizon_len}",
+            f"  config.output_patch_len = {training_shape.output_patch_len}",
+            f"  config.batch_size = {batch_size}",
+        ]
+    )
     updated_text, count = re.subn(
-        r"config\.batch_size\s*=\s*([0-9_ *()+-]+)",
-        f"config.batch_size = {batch_size}",
+        r"(\n\s+return config)",
+        "\n" + override_block + r"\1",
         source_text,
         count=1,
     )
     if count != 1:
-        raise ValueError("Could not rewrite config.batch_size in the copied training config.")
+        raise ValueError("Could not inject the effective config override block.")
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     destination_path.write_text(updated_text, encoding="utf-8")
 
@@ -275,18 +384,35 @@ def run_training_from_bundle(
     requested_batch_size: int | None = None,
     backend: str = "gpu",
     python_executable: str = sys.executable,
-    context_len: int = 512,
-    horizon_len: int = 128,
-    stride: int = 128,
+    context_len: int | None = None,
+    horizon_len: int | None = None,
+    stride: int | None = None,
+    training_context_len: int | None = None,
+    training_output_len: int | None = None,
+    training_horizon_len: int | None = None,
+    training_output_patch_len: int | None = None,
 ) -> dict[str, Any]:
     bundle = load_prepared_bundle(bundle_dir)
     parent = classify_parent_checkpoint(parent_checkpoint)
-    original_config_text = config_path.read_text(encoding="utf-8")
-    source_batch_size = extract_config_batch_size(original_config_text)
+    source_config, training_shape = resolve_effective_training_shape(
+        config_path=config_path,
+        training_context_len=training_context_len,
+        training_output_len=training_output_len,
+        training_horizon_len=training_horizon_len,
+        training_output_patch_len=training_output_patch_len,
+    )
+    validate_bundle_window_length(
+        window_length=int(bundle["dataset_manifest"]["window_length"]),
+        shape=training_shape,
+    )
+    source_batch_size = int(source_config["batch_size"])
     effective_batch_size = derive_compatible_batch_size(
         sample_count=bundle["sample_count"],
         requested_batch_size=requested_batch_size or source_batch_size,
     )
+    evaluation_context_len = context_len or training_shape.context_len
+    evaluation_horizon_len = horizon_len or training_shape.horizon_len
+    evaluation_stride = stride or evaluation_horizon_len
 
     runs_root = output_root / DEFAULT_RUNS_DIRNAME
     run_dir = runs_root / resolve_run_name(run_name, bundle["dataset_manifest_id"])
@@ -298,10 +424,11 @@ def run_training_from_bundle(
     backtest_summary_path = run_dir / "backtest_summary.json"
     run_manifest_path = run_dir / "run_manifest.json"
 
-    copy_config_with_batch_size(
+    copy_config_with_overrides(
         source_path=config_path,
         destination_path=copied_config_path,
         batch_size=effective_batch_size,
+        training_shape=training_shape,
     )
 
     training_command = build_training_command(
@@ -352,6 +479,12 @@ def run_training_from_bundle(
             "copied_sha256": file_sha256(copied_config_path.resolve()),
             "requested_batch_size": requested_batch_size or source_batch_size,
             "effective_batch_size": effective_batch_size,
+            "effective_training_shape": training_shape.to_dict(),
+        },
+        "post_train_evaluation": {
+            "context_len": evaluation_context_len,
+            "horizon_len": evaluation_horizon_len,
+            "stride": evaluation_stride,
         },
         "environment": {
             "snapshot_path": str(environment_snapshot_path.resolve()),
@@ -380,9 +513,9 @@ def run_training_from_bundle(
         output_path=evaluation_summary_path,
         checkpoint_reference=str(produced_checkpoint.resolve()),
         checkpoint_kind="path",
-        context_len=context_len,
-        horizon_len=horizon_len,
-        stride=stride,
+        context_len=evaluation_context_len,
+        horizon_len=evaluation_horizon_len,
+        stride=evaluation_stride,
         backend=backend,
     )
     backtest_summary = backtest_training_run(
@@ -390,9 +523,9 @@ def run_training_from_bundle(
         output_path=backtest_summary_path,
         checkpoint_reference=str(produced_checkpoint.resolve()),
         checkpoint_kind="path",
-        context_len=context_len,
-        horizon_len=horizon_len,
-        stride=stride,
+        context_len=evaluation_context_len,
+        horizon_len=evaluation_horizon_len,
+        stride=evaluation_stride,
         backend=backend,
     )
 
@@ -431,6 +564,10 @@ def main(argv: list[str] | None = None) -> None:
         context_len=args.context_len,
         horizon_len=args.horizon_len,
         stride=args.stride,
+        training_context_len=args.training_context_len,
+        training_output_len=args.training_output_len,
+        training_horizon_len=args.training_horizon_len,
+        training_output_patch_len=args.training_output_patch_len,
     )
     print(f"Run bundle: {manifest['run_dir']}")
     print(f"Evaluation summary: {manifest['evaluation_summary_path']}")

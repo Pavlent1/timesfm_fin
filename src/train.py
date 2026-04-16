@@ -33,6 +33,7 @@ from paxml import checkpoint_types
 from clu import metric_writers
 import tensorflow as tf
 
+from training_shapes import resolve_training_shape
 from utils import mse, get_accuracy, get_returns, get_confusion_matrix
 
 NestedMap = py_utils.NestedMap
@@ -70,25 +71,47 @@ def random_masking(batch_train, input_len=512, context_len=512, output_len=128):
         - input_padding (jnp.ndarray): The padding mask indicating which input items are kept.
     """
     batch_size, seq_len = batch_train.shape
-    random_drop = np.random.randint(0, context_len-output_len) 
+    expected_sequence_length = context_len + output_len
+    if seq_len != expected_sequence_length:
+        raise ValueError(
+            f"Expected batch sequence length {expected_sequence_length}, got {seq_len}."
+        )
+
+    max_random_drop = context_len - output_len
+    if max_random_drop <= 0:
+        raise ValueError("context_len must be greater than output_len for random masking.")
+
+    random_drop = np.random.randint(0, max_random_drop + 1)
     if random_drop > 0:
         batch_train = batch_train[:, :-random_drop]
         prepend = jnp.ones((batch_size, random_drop))
         batch_train = jnp.concatenate([prepend, batch_train], axis=1)
     output_sequences = batch_train[:, -output_len:]
-    input_sequences = batch_train[:, :-output_len]
+    input_sequences = batch_train[:, :context_len]
 
     nums = jnp.arange(0, context_len)
     input_padding = jnp.array(nums).reshape((1, context_len))
     input_padding = jnp.repeat(input_padding, batch_size, axis=0)
-    random_indices = np.random.randint(random_drop, context_len-output_len, size=(batch_size, 1))
+    random_indices = np.random.randint(
+        random_drop,
+        max_random_drop + 1,
+        size=(batch_size, 1),
+    )
     random_indices = jnp.repeat(random_indices, context_len, axis=1)
     input_padding = jnp.where(input_padding >= random_indices, 0, 1)
 
     return input_sequences, output_sequences, input_padding
 
 
-def train_step(states, prng_key, batch, jax_task=None):
+def train_step(
+    states,
+    prng_key,
+    batch,
+    jax_task=None,
+    input_len=512,
+    context_len=512,
+    output_len=128,
+):
     """
     Performs a single training step for a JAX-based learning model.
 
@@ -106,13 +129,29 @@ def train_step(states, prng_key, batch, jax_task=None):
     Returns:
         Updated states after completing the training step, in a tuple (state, step_function_output)
     """
-    input_map, output_sequences = prepare_batch_data(batch)
+    input_map, output_sequences = prepare_batch_data(
+        batch,
+        input_len=input_len,
+        context_len=context_len,
+        output_len=output_len,
+        horizon_len=output_len,
+    )
     inputs = NestedMap(input_ts=input_map['input_ts'], input_padding=input_map['input_padding'], actual_ts=output_sequences)
     return trainer_lib.train_step_single_learner(
         jax_task, states, prng_key, inputs
     )
 
-def eval_step(states, prng_key, batch, jax_task=None, store_metrics=False, horizon_len=128):
+def eval_step(
+    states,
+    prng_key,
+    batch,
+    jax_task=None,
+    store_metrics=False,
+    input_len=512,
+    context_len=512,
+    output_len=128,
+    horizon_len=128,
+):
     """
     Performs a single evaluation step for a JAX-based learning model.
 
@@ -133,7 +172,14 @@ def eval_step(states, prng_key, batch, jax_task=None, store_metrics=False, horiz
         - input sequences
         - output_sequences (ground truth)
     """
-    input_map, output_sequences = prepare_batch_data(batch, train=False, horizon_len=horizon_len)
+    input_map, output_sequences = prepare_batch_data(
+        batch,
+        train=False,
+        input_len=input_len,
+        context_len=context_len,
+        output_len=output_len,
+        horizon_len=horizon_len,
+    )
     inputs = NestedMap(input_ts=input_map['input_ts'], actual_ts=output_sequences)
     states = states.to_eval_state()
     _, step_fun_out = trainer_lib.eval_step_single_learner(
@@ -160,20 +206,28 @@ def prepare_batch_data(batch, train=True, input_len=512, context_len=512, output
         - output_sequences (jnp.ndarray): The sequences used as output (typically the last output_len items).
     """
     batch_size, sequence_length = batch.shape
-    num_input_patches = sequence_length // input_len + 1
+    expected_sequence_length = context_len + output_len
+    if sequence_length != expected_sequence_length:
+        raise ValueError(
+            f"Expected batch sequence length {expected_sequence_length}, got {sequence_length}."
+        )
+    if input_len != context_len:
+        raise ValueError("input_len must match context_len in the legacy training path.")
+    if output_len != horizon_len:
+        raise ValueError(
+            "The legacy training path requires output_len and horizon_len to match."
+        )
 
     if train: 
-        input_sequences, output_sequences, input_padding = random_masking(batch_train=batch)
+        input_sequences, output_sequences, input_padding = random_masking(
+            batch_train=batch,
+            input_len=input_len,
+            context_len=context_len,
+            output_len=output_len,
+        )
     else:
-        input_sequences = []
-        output_sequences = []
-        for input_end in range(context_len, sequence_length, horizon_len):
-            input_start = input_end-context_len
-            input_sequences.append(batch[:, input_start:input_end])
-            output_sequences.append(batch[:, input_end:input_end+horizon_len])
-        input_sequences = jnp.concatenate(input_sequences, axis=0)
-        output_sequences = jnp.concatenate(output_sequences, axis=0)
-        batch_size = input_sequences.shape[0]
+        input_sequences = batch[:, :context_len]
+        output_sequences = batch[:, context_len:context_len + output_len]
         input_padding = jnp.zeros((batch_size, context_len))
 
     inp_freq = jnp.zeros((batch_size, 1))
@@ -366,6 +420,7 @@ def train_and_evaluate(
     logger.info('config.batch_size: {}'.format(config.batch_size))
 
     writer = tf.summary.create_file_writer(logdir)
+    training_shape = resolve_training_shape(config)
 
     logger.info('config.batch_size: {}'.format(config.batch_size))
 
@@ -416,8 +471,8 @@ def train_and_evaluate(
     key = jax.random.PRNGKey(seed=config.seed)
     key, init_key = jax.random.split(key)
 
-    init_ts = jnp.ones((num_devices, config.input_len))
-    init_touts = jnp.ones((num_devices, config.output_len))
+    init_ts = jnp.ones((num_devices, training_shape.input_len))
+    init_touts = jnp.ones((num_devices, training_shape.output_len))
     init_batch = NestedMap(input_ts=init_ts, actual_ts=init_touts)
 
     jax_model_states, _ = trainer_lib.initialize_model_state(
@@ -436,8 +491,28 @@ def train_and_evaluate(
     train_prng_seed = jax.random.split(train_key, num=num_devices)
     eval_prng_seed = jax.random.split(eval_key, num=num_devices)
 
-    p_train_step = jax.pmap(functools.partial(train_step, jax_task=jax_task), axis_name='batch')
-    p_eval_step = jax.pmap(functools.partial(eval_step, jax_task=jax_task, store_metrics=True), axis_name='batch')
+    p_train_step = jax.pmap(
+        functools.partial(
+            train_step,
+            jax_task=jax_task,
+            input_len=training_shape.input_len,
+            context_len=training_shape.context_len,
+            output_len=training_shape.output_len,
+        ),
+        axis_name='batch',
+    )
+    p_eval_step = jax.pmap(
+        functools.partial(
+            eval_step,
+            jax_task=jax_task,
+            store_metrics=True,
+            input_len=training_shape.input_len,
+            context_len=training_shape.context_len,
+            output_len=training_shape.output_len,
+            horizon_len=training_shape.horizon_len,
+        ),
+        axis_name='batch',
+    )
 
     replicated_jax_states = trainer_lib.replicate_model_state(jax_model_states)
 

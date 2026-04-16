@@ -1,6 +1,6 @@
 # `src/main.py`
 
-This file is the legacy top-level training or evaluation entrypoint for the fine-tuning workflow. It defines `absl.flags`, loads the config file from `configs/fine_tuning.py`, constructs a `timesfm.TimesFm` model around either a supplied checkpoint path, a supplied Hugging Face repo id, or the base Google checkpoint, and then dispatches to either `src/train.py` or `src/evaluation.py`.
+This file is the legacy top-level training or evaluation entrypoint for the fine-tuning workflow. It defines `absl.flags`, loads the config file from `configs/fine_tuning.py`, resolves the effective training shape through `src/training_shapes.py`, constructs a `timesfm.TimesFm` model around either a supplied checkpoint path, a supplied Hugging Face repo id, or the base Google checkpoint, and then dispatches to either `src/train.py` or `src/evaluation.py`.
 
 Important behaviors:
 
@@ -10,5 +10,6 @@ Important behaviors:
 - accepts either `--checkpoint_path` or `--checkpoint_repo_id` for explicit parent selection
 - still falls back to the Google base checkpoint when neither explicit parent flag is provided
 - now accepts an explicit `--backend` flag instead of hardcoding GPU
+- no longer hardcodes the legacy `128/128` horizon internally; it reads `context_len`, `horizon_len`, and `output_patch_len` from the validated config shape
 
 Category: training/evaluation entrypoint.

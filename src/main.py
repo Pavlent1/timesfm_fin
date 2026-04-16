@@ -9,6 +9,7 @@ import timesfm
 
 import train
 import evaluation
+from training_shapes import resolve_training_shape
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -37,12 +38,13 @@ def main(argv):
   checkpoint_path = FLAGS.checkpoint_path
   checkpoint_repo_id = FLAGS.checkpoint_repo_id
   config.dataset_path = FLAGS.dataset_path
+  training_shape = resolve_training_shape(config)
 
   hparams = timesfm.TimesFmHparams(
-    context_len=512,
-    horizon_len=128, # TODO: why does setting horizon_len to 512 not work
+    context_len=training_shape.context_len,
+    horizon_len=training_shape.horizon_len,
     input_patch_len=32,
-    output_patch_len=128, # this is set to the same as horizon length during training
+    output_patch_len=training_shape.output_patch_len,
     num_layers=20,
     model_dims=1280,
     backend=FLAGS.backend

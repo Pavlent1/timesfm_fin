@@ -41,6 +41,7 @@ def get_config():
   config.context_len = config.input_len = 512
   config.output_len = 128
   config.horizon_len = 128
+  config.output_patch_len = 128
 
   # Training
   config.learning_rate = 1e-4

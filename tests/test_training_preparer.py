@@ -251,4 +251,57 @@ def test_preparer_emits_fixed_length_positive_train_windows_and_holdout_artifact
     assert dataset_manifest["sample_counts"]["total"] == train_windows.shape[1]
     assert dataset_manifest["sample_counts"]["per_symbol"]["BTCUSDT"] >= 1
     assert dataset_manifest["sample_counts"]["per_symbol"]["SOLUSDT"] >= 1
+    assert dataset_manifest["stride"] == 128
     assert set(window_index["symbol"]) == {"BTCUSDT", "SOLUSDT"}
+
+
+@pytest.mark.integration
+def test_preparer_preserves_stride_one_and_emits_dense_window_counts(
+    bootstrapped_postgres_connection,
+    tmp_path,
+) -> None:
+    manifest_module = load_manifest_module()
+    preparer_module = load_preparer_module()
+    start = datetime(2025, 4, 1, 0, 0, tzinfo=timezone.utc)
+
+    seed_series(
+        bootstrapped_postgres_connection,
+        symbol="BTCUSDT",
+        observations=make_minutes(start, 960, base_price=70000.0),
+    )
+
+    manifest = manifest_module.validate_manifest(
+        {
+            "source_name": "binance",
+            "timeframe": "1m",
+            "preset": None,
+            "window_length": 640,
+            "stride": 1,
+            "cleaning": {"mode": "strict", "repairable_gap_minutes": 5},
+            "symbols": [
+                {
+                    "symbol": "BTCUSDT",
+                    "train_start_utc": "2025-04-01T00:00:00Z",
+                    "train_end_utc": "2025-04-01T13:00:00Z",
+                    "holdout_start_utc": "2025-04-01T13:00:00Z",
+                    "holdout_end_utc": "2025-04-01T16:00:00Z",
+                }
+            ],
+        }
+    )
+
+    result = preparer_module.prepare_training_bundle(
+        bootstrapped_postgres_connection,
+        manifest,
+        tmp_path / "dense_bundle",
+    )
+    dataset_manifest = json.loads(result["dataset_manifest_path"].read_text(encoding="utf-8"))
+    quality_report = json.loads(result["quality_report_path"].read_text(encoding="utf-8"))
+    window_index = pd.read_csv(result["window_index_path"])
+
+    expected_windows = 780 - 640 + 1
+    assert dataset_manifest["stride"] == 1
+    assert quality_report["stride"] == 1
+    assert dataset_manifest["sample_counts"]["total"] == expected_windows
+    assert dataset_manifest["sample_counts"]["per_symbol"]["BTCUSDT"] == expected_windows
+    assert len(window_index) == expected_windows

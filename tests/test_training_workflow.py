@@ -29,7 +29,13 @@ def load_backtest_adapter_module():
     return pytest.importorskip("backtest_training_run")
 
 
-def create_prepared_bundle(tmp_path: Path, *, total_samples: int = 5) -> Path:
+def create_prepared_bundle(
+    tmp_path: Path,
+    *,
+    total_samples: int = 5,
+    window_length: int = 640,
+    stride: int = 128,
+) -> Path:
     bundle_dir = tmp_path / "prepared_bundle"
     bundle_dir.mkdir()
     (bundle_dir / "train_windows.csv").write_text(
@@ -58,8 +64,8 @@ def create_prepared_bundle(tmp_path: Path, *, total_samples: int = 5) -> Path:
                 "manifest_id": "bundle-123",
                 "source_name": "binance",
                 "timeframe": "1m",
-                "window_length": 640,
-                "stride": 128,
+                "window_length": window_length,
+                "stride": stride,
                 "cleaning": {"mode": "strict", "repairable_gap_minutes": 5},
                 "sample_counts": {
                     "total": total_samples,
@@ -196,7 +202,7 @@ def test_training_wrapper_records_parentage_batch_size_and_post_train_artifacts(
     tmp_path,
 ) -> None:
     module = load_training_workflow_module()
-    bundle_dir = create_prepared_bundle(tmp_path, total_samples=5)
+    bundle_dir = create_prepared_bundle(tmp_path, total_samples=5, window_length=517, stride=1)
     requirements_path = tmp_path / "requirements.training.txt"
     requirements_path.write_text("timesfm[pax]==1.3.0\n", encoding="utf-8")
     commands: list[list[str]] = []
@@ -249,6 +255,11 @@ def test_training_wrapper_records_parentage_batch_size_and_post_train_artifacts(
         requirements_path=requirements_path,
         parent_checkpoint="pfnet/timesfm-1.0-200m-fin",
         run_name="starter-run",
+        training_output_len=5,
+        training_horizon_len=5,
+        context_len=None,
+        horizon_len=None,
+        stride=None,
     )
 
     run_dir = Path(result["run_dir"])
@@ -259,9 +270,15 @@ def test_training_wrapper_records_parentage_batch_size_and_post_train_artifacts(
     assert run_dir.name == "starter-run"
     assert copied_config_path.exists()
     assert "config.batch_size = 3" in copied_config_path.read_text(encoding="utf-8")
+    assert "config.output_len = 5" in copied_config_path.read_text(encoding="utf-8")
+    assert "config.horizon_len = 5" in copied_config_path.read_text(encoding="utf-8")
     assert saved_manifest["parent_checkpoint"]["kind"] == "repo"
     assert saved_manifest["parent_checkpoint"]["value"] == "pfnet/timesfm-1.0-200m-fin"
     assert saved_manifest["training_config"]["effective_batch_size"] == 3
+    assert saved_manifest["training_config"]["effective_training_shape"]["output_len"] == 5
+    assert saved_manifest["training_config"]["effective_training_shape"]["horizon_len"] == 5
+    assert saved_manifest["post_train_evaluation"]["horizon_len"] == 5
+    assert saved_manifest["post_train_evaluation"]["stride"] == 5
     assert saved_manifest["prepared_bundle"]["dataset_manifest_id"] == "bundle-123"
     assert saved_manifest["trainer_internal_eval"]["canonical_for_phase3_comparison"] is False
     assert saved_manifest["produced_checkpoint"]["value"].endswith("fine-tuning-test")
@@ -321,6 +338,42 @@ def test_training_wrapper_uses_checkpoint_path_flag_for_local_parent_checkpoint(
     assert commands
     assert any(f"--checkpoint_path={local_checkpoint}" == item for item in commands[0])
     assert not any(item.startswith("--checkpoint_repo_id=") for item in commands[0])
+
+
+def test_training_wrapper_rejects_incompatible_output_and_horizon_lengths(tmp_path) -> None:
+    module = load_training_workflow_module()
+    bundle_dir = create_prepared_bundle(tmp_path, total_samples=8)
+    requirements_path = tmp_path / "requirements.training.txt"
+    requirements_path.write_text("timesfm[pax]==1.3.0\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="output_len and horizon_len"):
+        module.run_training_from_bundle(
+            bundle_dir=bundle_dir,
+            output_root=tmp_path / "outputs",
+            config_path=REPO_ROOT / "configs" / "fine_tuning.py",
+            requirements_path=requirements_path,
+            parent_checkpoint="pfnet/timesfm-1.0-200m-fin",
+            training_output_len=8,
+            training_horizon_len=5,
+        )
+
+
+def test_training_wrapper_rejects_bundle_window_length_mismatch(tmp_path) -> None:
+    module = load_training_workflow_module()
+    bundle_dir = create_prepared_bundle(tmp_path, total_samples=8, window_length=640)
+    requirements_path = tmp_path / "requirements.training.txt"
+    requirements_path.write_text("timesfm[pax]==1.3.0\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="window_length"):
+        module.run_training_from_bundle(
+            bundle_dir=bundle_dir,
+            output_root=tmp_path / "outputs",
+            config_path=REPO_ROOT / "configs" / "fine_tuning.py",
+            requirements_path=requirements_path,
+            parent_checkpoint="pfnet/timesfm-1.0-200m-fin",
+            training_output_len=5,
+            training_horizon_len=5,
+        )
 
 
 def test_evaluation_adapter_writes_holdout_summary_for_explicit_artifact(tmp_path) -> None:
