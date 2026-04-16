@@ -12,6 +12,7 @@ This roadmap hardens the existing repository into a trustworthy forecasting tool
 
 - [x] **Phase 1: Set up PostgreSQL database, download and discover all data, add sorting and organization** - Build the initial data foundation for storing, exploring, and organizing the project dataset. Completed 2026-04-13.
 - [ ] **Phase 2: Create backtest architecture, qualification rules, and statistics collection** - Define the backtest structure, qualification criteria, and statistics pipeline needed for trustworthy evaluation.
+- [ ] **Phase 3: Train the model on 1-minute crypto candles** - Establish a repeatable manual fine-tuning workflow with explicit lineage and comparison-ready outputs. Awaiting human verification.
 
 ## Phase Details
 
@@ -53,12 +54,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2
+Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Set up PostgreSQL database, download and discover all data, add sorting and organization | 4/4 | Complete | 2026-04-13 |
 | 2. Create backtest architecture, qualification rules, and statistics collection | 1/3 | In Progress | - |
+| 3. Train the model on 1-minute crypto candles | 5/5 | Awaiting Human Verification | - |
 
 ### Phase 3: Train the model on 1-minute crypto candles
 
@@ -71,5 +73,5 @@ Plans:
 - [x] 03-01-PLAN.md - Prepare and verify Phase 3 PostgreSQL source coverage for BTCUSDT, ETHUSDT, and SOLUSDT
 - [x] 03-02-PLAN.md - Materialize manifest-driven cleaned training bundles with explicit holdouts
 - [x] 03-03-PLAN.md - Freeze the manual training environment and capture reproducibility metadata
-- [ ] 03-04-PLAN.md - Wrap the legacy trainer and emit canonical post-train evaluation/backtest summaries
-- [ ] 03-05-PLAN.md - Generate lineage and cross-run comparison reports
+- [x] 03-04-PLAN.md - Wrap the legacy trainer and emit canonical post-train evaluation/backtest summaries
+- [x] 03-05-PLAN.md - Generate lineage and cross-run comparison reports
