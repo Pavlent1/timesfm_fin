@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-04-14T15:06:59.992Z"
-last_activity: 2026-04-14
+stopped_at: Phase 3 context gathered
+last_updated: "2026-04-16T11:11:33.341Z"
+last_activity: "2026-04-15 - Completed quick task 260416-1nx: add per-step direction-above-below-last-input accuracy metric to backtests"
 progress:
-  total_phases: 2
-  completed_phases: 1
+  total_phases: 3
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 100
 ---
 
 # Project State
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 Phase: 02 (create-backtest-architecture-qualification-rules-and-statist) — EXECUTING
 Plan: 3 of 3
 Status: Ready to execute
-Last activity: 2026-04-14
+Last activity: 2026-04-15 - Completed quick task 260416-1nx: add per-step direction-above-below-last-input accuracy metric to backtests
 
 Progress: [███████░░░] 71%
 
@@ -76,6 +76,7 @@ None yet.
 
 - Phase 1 added: Set up PostgreSQL database, download and discover all data, add sorting and organization
 - Phase 2 added: Create backtest architecture, qualification rules, and statistics collection
+- Phase 3 added: Train the model on 1-minute crypto candles
 - Phase 1 completed: PostgreSQL data foundation, ingestion, discovery, verification, and CSV bridge are now in the repo
 
 ### Blockers/Concerns
@@ -91,9 +92,11 @@ None yet.
 | 260413-wyl | create repo-wide automated test roadmap from current audit artifacts | 2026-04-13 | working-tree | [260413-wyl-create-repo-wide-automated-test-roadmap-](./quick/260413-wyl-create-repo-wide-automated-test-roadmap-/) |
 | 260414-gnw | initialize autotest execution log blocker for helper-test-execute-plan preflight | 2026-04-14 | working-tree | [260414-gnw-initialize-autotest-execution-log-blocke](./quick/260414-gnw-initialize-autotest-execution-log-blocke/) |
 | 260414-gyh | execute wave 1 of the global autotest plan | 2026-04-14 | working-tree | [260414-gyh-execute-wave-1-of-the-global-autotest-pl](./quick/260414-gyh-execute-wave-1-of-the-global-autotest-pl/) |
+| 260416-0w5 | fix backtest overshoot and undershoot metrics to report average percent magnitude | 2026-04-15 | working-tree | [260416-0w5-fix-backtest-overshoot-and-undershoot-me](./quick/260416-0w5-fix-backtest-overshoot-and-undershoot-me/) |
+| 260416-1nx | add per-step direction-above-below-last-input accuracy metric to backtests | 2026-04-15 | working-tree | [260416-1nx-add-per-step-direction-above-below-last-](./quick/260416-1nx-add-per-step-direction-above-below-last-/) |
 
 ## Session Continuity
 
-Last session: 2026-04-14T15:06:59.987Z
-Stopped at: Completed 02-02-PLAN.md
-Resume file: None
+Last session: 2026-04-16T11:11:33.336Z
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-train-the-model-on-1-minute-crypto-candles/03-CONTEXT.md
