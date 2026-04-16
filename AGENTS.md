@@ -4,6 +4,10 @@
 
 This is the repo-level instruction entrypoint that runtime agents can discover automatically.
 
+## Local Runtime Handoff
+
+Read `LOCAL_RUNTIME_NOTES.md` for the current machine-specific runtime facts before attempting model training, checkpoint loading, or environment setup changes.
+
 ## Git Checkpoints
 
 - Create commits on the currently checked out branch at logical checkpoints during multi-step work.

@@ -214,6 +214,10 @@ def test_training_wrapper_records_parentage_batch_size_and_post_train_artifacts(
 
     def fake_train(command: list[str]) -> None:
         commands.append(command)
+        workdir_arg = next(item for item in command if item.startswith("--workdir="))
+        run_dir = Path(workdir_arg.split("=", 1)[1])
+        checkpoint_dir = run_dir / "checkpoints" / "fine-tuning-test"
+        (checkpoint_dir / "checkpoint_1").mkdir(parents=True, exist_ok=True)
 
     def fake_evaluate(**kwargs):
         summary = {
@@ -260,6 +264,7 @@ def test_training_wrapper_records_parentage_batch_size_and_post_train_artifacts(
     assert saved_manifest["training_config"]["effective_batch_size"] == 3
     assert saved_manifest["prepared_bundle"]["dataset_manifest_id"] == "bundle-123"
     assert saved_manifest["trainer_internal_eval"]["canonical_for_phase3_comparison"] is False
+    assert saved_manifest["produced_checkpoint"]["value"].endswith("fine-tuning-test")
     assert saved_manifest["backtest_run_id"] == 17
     assert Path(saved_manifest["environment"]["snapshot_path"]).exists()
     assert Path(saved_manifest["evaluation_summary_path"]).exists()
@@ -281,7 +286,15 @@ def test_training_wrapper_uses_checkpoint_path_flag_for_local_parent_checkpoint(
     commands: list[list[str]] = []
 
     monkeypatch.setattr(module, "capture_training_environment", lambda **kwargs: {"command": kwargs["command"]})
-    monkeypatch.setattr(module, "invoke_training_entrypoint", lambda command: commands.append(command))
+
+    def fake_train(command: list[str]) -> None:
+        commands.append(command)
+        workdir_arg = next(item for item in command if item.startswith("--workdir="))
+        run_dir = Path(workdir_arg.split("=", 1)[1])
+        checkpoint_dir = run_dir / "checkpoints" / "fine-tuning-test"
+        (checkpoint_dir / "checkpoint_1").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(module, "invoke_training_entrypoint", fake_train)
 
     def fake_eval(**kwargs):
         summary = {}

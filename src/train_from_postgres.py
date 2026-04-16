@@ -240,6 +240,30 @@ def invoke_training_entrypoint(command: list[str]) -> None:
     subprocess.run(command, cwd=REPO_ROOT, check=True)
 
 
+def discover_produced_checkpoint(run_dir: Path) -> Path:
+    checkpoints_root = run_dir / "checkpoints"
+    if not checkpoints_root.exists():
+        raise ValueError(
+            "Training finished but no checkpoints directory was created under "
+            f"{run_dir}."
+        )
+
+    candidate_dirs: list[Path] = []
+    for candidate in checkpoints_root.rglob("*"):
+        if not candidate.is_dir():
+            continue
+        if any(child.name.startswith("checkpoint_") for child in candidate.iterdir()):
+            candidate_dirs.append(candidate)
+
+    if not candidate_dirs:
+        raise ValueError(
+            "Training finished but no checkpoint bundle directory was found under "
+            f"{checkpoints_root}."
+        )
+
+    return max(candidate_dirs, key=lambda path: path.stat().st_mtime)
+
+
 def run_training_from_bundle(
     *,
     bundle_dir: Path,
@@ -344,11 +368,17 @@ def run_training_from_bundle(
     write_json(run_manifest_path, manifest)
 
     invoke_training_entrypoint(training_command)
+    produced_checkpoint = discover_produced_checkpoint(run_dir)
+    manifest["produced_checkpoint"] = {
+        "kind": "local_path",
+        "value": str(produced_checkpoint.resolve()),
+    }
+    write_json(run_manifest_path, manifest)
 
     evaluation_summary = evaluate_training_run(
         holdout_series_path=bundle["holdout_series_path"],
         output_path=evaluation_summary_path,
-        checkpoint_reference=str(run_dir.resolve()),
+        checkpoint_reference=str(produced_checkpoint.resolve()),
         checkpoint_kind="path",
         context_len=context_len,
         horizon_len=horizon_len,
@@ -358,7 +388,7 @@ def run_training_from_bundle(
     backtest_summary = backtest_training_run(
         holdout_series_path=bundle["holdout_series_path"],
         output_path=backtest_summary_path,
-        checkpoint_reference=str(run_dir.resolve()),
+        checkpoint_reference=str(produced_checkpoint.resolve()),
         checkpoint_kind="path",
         context_len=context_len,
         horizon_len=horizon_len,
