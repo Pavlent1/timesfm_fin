@@ -254,6 +254,20 @@ python src/postgres_prepare_training.py --manifest outputs/training_manifest.jso
 python src/train_from_postgres.py --bundle-dir outputs/prepared_bundle --output-root outputs/training_runs --parent-checkpoint pfnet/timesfm-1.0-200m-fin --run-name starter-run
 ```
 
+For short-horizon reruns, the wrapper can either consume a short-horizon config
+file or override the copied training shape directly. A dense 5-step rerun looks
+like this:
+
+```bash
+python src/postgres_prepare_training.py --manifest outputs/btc_one_month_manifest_h5_stride1.json --output-dir outputs/prepared_btc_one_month_h5_stride1
+python src/train_from_postgres.py --bundle-dir outputs/prepared_btc_one_month_h5_stride1 --output-root outputs/training_runs --config outputs/fine_tuning_short_h5_1ep.py --parent-checkpoint /root/.cache/huggingface/.../checkpoints --run-name btc-one-month-h5-s1-1ep-b1 --horizon-len 5 --stride 5
+```
+
+If you want to keep the source config on the legacy defaults and only change the
+effective copied run config, `src/train_from_postgres.py` also accepts
+`--training-context-len`, `--training-output-len`,
+`--training-horizon-len`, and `--training-output-patch-len`.
+
 This writes a deterministic run bundle under `outputs/training_runs/runs/<run-name>/`
 with:
 
