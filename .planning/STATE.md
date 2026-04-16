@@ -99,4 +99,4 @@ None yet.
 
 Last session: 2026-04-16T11:11:33.336Z
 Stopped at: Phase 03 planning complete
-Resume file: .planning/phases/03-train-the-model-on-1-minute-crypto-candles/03-04-PLAN.md
+Resume file: .planning/phases/03-train-the-model-on-1-minute-crypto-candles/03-05-PLAN.md

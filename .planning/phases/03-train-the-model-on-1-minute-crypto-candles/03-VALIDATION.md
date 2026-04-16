@@ -40,8 +40,9 @@ created: 2026-04-16
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
 | 03-01-01 | 01 | 1 | MODEL-01, MODEL-02 | T-03-01 / T-03-03 | Source readiness rejects unsupported symbols, incomplete coverage, and blocking minute-gap segments before preparation starts | integration | `python -m pytest -q tests/test_postgres_prepare_training_source.py -x` | no - W0 | pending |
 | 03-02-01 | 02 | 2 | MODEL-02 | T-03-04 / T-03-06 | Manifest validation and preparer output preserve explicit train/holdout boundaries and machine-readable quality reporting | integration/contract | `python -m pytest -q tests/test_training_manifest.py tests/test_training_preparer.py -x` | no - W0 | pending |
-| 03-03-01 | 03 | 3 | MODEL-01, OPS-01 | T-03-07 / T-03-09 | Manual training wrapper requires an explicit parent checkpoint and records frozen environment plus run metadata in one deterministic directory | integration | `python -m pytest -q tests/test_training_workflow.py -x` | no - W0 | pending |
-| 03-04-01 | 04 | 4 | MODEL-01, OPS-01 | T-03-10 / T-03-12 | Lineage and comparison outputs attach eval/backtest summaries to each run and make cross-run differences traceable | contract | `python -m pytest -q tests/test_training_lineage.py -x` | no - W0 | pending |
+| 03-03-01 | 03 | 3 | MODEL-01, OPS-01 | T-03-09 | Training environment capture freezes the supported dependency set and records reproducibility metadata before later wrapper launches rely on it | integration/contract | `python -m pytest -q tests/test_training_workflow.py -k environment -x` | no - W0 | pending |
+| 03-04-01 | 04 | 4 | MODEL-01, OPS-01 | T-03-07 / T-03-08 | Manual training wrapper requires an explicit parent checkpoint, validates starter-run batch size, and writes canonical evaluation/backtest summaries into one deterministic run bundle | integration | `python -m pytest -q tests/test_training_workflow.py -x` | no - W0 | pending |
+| 03-05-01 | 05 | 5 | MODEL-01, OPS-01 | T-03-10 / T-03-12 | Lineage and comparison outputs attach eval/backtest summaries to each run and make cross-run differences traceable | contract | `python -m pytest -q tests/test_training_lineage.py -x` | no - W0 | pending |
 
 *Status: pending, green, red, flaky*
 
@@ -52,7 +53,7 @@ created: 2026-04-16
 - [ ] `tests/test_postgres_prepare_training_source.py` - source coverage targets, allowed symbol scope, segment-aware integrity findings, and readiness blocking behavior
 - [ ] `tests/test_training_manifest.py` - manifest schema validation, explicit holdout boundaries, preset helpers, and copied config metadata
 - [ ] `tests/test_training_preparer.py` - fixed-length 640-point window emission, strict vs repair handling, and quality report fields
-- [ ] `tests/test_training_workflow.py` - wrapper invocation, explicit parent-checkpoint capture, deterministic run-bundle layout, and environment snapshot coverage
+- [ ] `tests/test_training_workflow.py` - environment snapshot coverage, wrapper invocation, explicit parent-checkpoint capture, deterministic run-bundle layout, and post-train summary generation
 - [ ] `tests/test_training_lineage.py` - per-run summary artifacts, backtest-run linkage, and cross-run comparison coverage
 - [ ] Extend PostgreSQL fixtures to seed BTC, ETH, and SOL minute data with short-gap, long-gap, and missing-symbol cases
 - [ ] Capture the supported Phase 3 training environment in `requirements.training.txt` before runtime verification depends on live installs
