@@ -613,3 +613,37 @@ def test_render_backtest_report_includes_step_stats_table() -> None:
     assert "avg_undershoot_deviation_pct" in report
     assert "direction_guess_accuracy_pct" in report
     assert "0.12" in report
+
+
+def test_render_backtest_report_shows_checkpoint_path_when_provided() -> None:
+    args = argparse.Namespace(
+        symbol="BTCUSDT",
+        day=date(2024, 4, 1),
+        days=1,
+        context_len=512,
+        horizon_len=5,
+        stride=5,
+        batch_size=64,
+        backend="gpu",
+        repo_id="stub/repo",
+        checkpoint_path="/workspace/outputs/training_runs/runs/demo/checkpoints/fine-tuning",
+        freq=0,
+        host="127.0.0.1",
+        port=54329,
+        db_name="timesfm_fin",
+    )
+
+    report = crypto_minute_backtest.render_backtest_report(
+        args=args,
+        requested_start_dt=datetime(2024, 4, 1, 0, 0, tzinfo=timezone.utc),
+        requested_end_dt=datetime(2024, 4, 2, 0, 0, tzinfo=timezone.utc),
+        loaded_candle_count=1952,
+        evaluation_candle_count=1440,
+        lookback_candle_count=512,
+        metrics={"points": 1952, "windows": 288},
+        run_id=100,
+        step_stats_rows=[],
+    )
+
+    assert "Checkpoint path: /workspace/outputs/training_runs/runs/demo/checkpoints/fine-tuning" in report
+    assert "Repo id: stub/repo" not in report

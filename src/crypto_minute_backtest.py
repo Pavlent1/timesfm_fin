@@ -146,6 +146,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Hugging Face checkpoint repo id.",
     )
     parser.add_argument(
+        "--checkpoint-path",
+        default=None,
+        help="Optional local TimesFM checkpoint path. Overrides --repo-id when provided.",
+    )
+    parser.add_argument(
         "--output-csv",
         type=Path,
         default=None,
@@ -467,7 +472,7 @@ def save_backtest(
         exchange=DEFAULT_SOURCE_NAME,
         symbol=args.symbol,
         interval=DEFAULT_TIMEFRAME,
-        model_repo_id=args.repo_id,
+        model_repo_id=resolve_model_reference(args),
         backend=args.backend,
         freq_bucket=args.freq,
         context_len=args.context_len,
@@ -517,6 +522,13 @@ def default_backtest_report_path(run_id: int) -> Path:
     return Path("outputs") / "backtests" / f"run_{run_id}.txt"
 
 
+def resolve_model_reference(args: argparse.Namespace) -> str:
+    checkpoint_path = getattr(args, "checkpoint_path", None)
+    if checkpoint_path:
+        return str(checkpoint_path)
+    return str(args.repo_id)
+
+
 def render_backtest_report(
     *,
     args: argparse.Namespace,
@@ -543,7 +555,11 @@ def render_backtest_report(
         f"Stride: {args.stride}",
         f"Batch size: {args.batch_size}",
         f"Backend: {args.backend}",
-        f"Repo id: {args.repo_id}",
+        (
+            f"Checkpoint path: {args.checkpoint_path}"
+            if getattr(args, "checkpoint_path", None)
+            else f"Repo id: {args.repo_id}"
+        ),
         f"Frequency bucket: {args.freq}",
         f"Loaded candles: {loaded_candle_count}",
         f"Requested-range candles: {evaluation_candle_count}",
@@ -687,6 +703,7 @@ def main() -> None:
         horizon_len=args.horizon_len,
         backend=args.backend,
         repo_id=args.repo_id,
+        checkpoint_path=getattr(args, "checkpoint_path", None),
     )
 
     with connect_postgres(settings=settings, autocommit=False) as conn:

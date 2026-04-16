@@ -72,6 +72,11 @@ def parse_args() -> argparse.Namespace:
         help="Hugging Face checkpoint repo id.",
     )
     parser.add_argument(
+        "--checkpoint-path",
+        default=None,
+        help="Optional local TimesFM checkpoint path. Overrides --repo-id when provided.",
+    )
+    parser.add_argument(
         "--output-csv",
         type=Path,
         default=None,
@@ -152,7 +157,13 @@ def infer_future_index(series, horizon_len: int):
     return pd.date_range(start=start, periods=horizon_len + 1, freq=inferred)[1:]
 
 
-def build_model(context_len: int, horizon_len: int, backend: str, repo_id: str):
+def build_model(
+    context_len: int,
+    horizon_len: int,
+    backend: str,
+    repo_id: str,
+    checkpoint_path: str | None = None,
+):
     if backend == "cpu":
         os.environ.setdefault("JAX_PLATFORMS", "cpu")
 
@@ -167,10 +178,16 @@ def build_model(context_len: int, horizon_len: int, backend: str, repo_id: str):
         model_dims=1280,
         backend=backend,
     )
-    checkpoint = timesfm.TimesFmCheckpoint(
-        version="jax",
-        huggingface_repo_id=repo_id,
-    )
+    if checkpoint_path:
+        checkpoint = timesfm.TimesFmCheckpoint(
+            version="jax",
+            path=checkpoint_path,
+        )
+    else:
+        checkpoint = timesfm.TimesFmCheckpoint(
+            version="jax",
+            huggingface_repo_id=repo_id,
+        )
     return timesfm.TimesFm(hparams=hparams, checkpoint=checkpoint)
 
 
@@ -207,6 +224,7 @@ def main() -> None:
         horizon_len=args.horizon_len,
         backend=args.backend,
         repo_id=args.repo_id,
+        checkpoint_path=getattr(args, "checkpoint_path", None),
     )
 
     point_forecast, _ = model.forecast([context], freq=[args.freq])
@@ -227,7 +245,7 @@ def main() -> None:
         forecast_df.to_csv(args.output_csv, index=False)
 
     print(f"Source: {source_label}")
-    print(f"Checkpoint: {args.repo_id}")
+    print(f"Checkpoint: {getattr(args, 'checkpoint_path', None) or args.repo_id}")
     print(f"Context points used: {context.size}")
     print(f"Latest observed {args.column}: {float(series.iloc[-1]):.4f}")
     print("")
