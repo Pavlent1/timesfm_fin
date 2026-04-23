@@ -134,6 +134,64 @@ def test_signed_deviation_pct_is_positive_for_overshoot_and_negative_for_undersh
     assert downward_undershoot == pytest.approx((-2.0 / 90.0) * 100.0)
 
 
+def test_absolute_move_pct_from_input_uses_last_input_close_as_reference() -> None:
+    metrics = load_metrics_module()
+
+    assert metrics.absolute_move_pct_from_input(
+        last_input_close=100.0,
+        close_value=103.0,
+    ) == pytest.approx(3.0)
+    assert metrics.absolute_move_pct_from_input(
+        last_input_close=100.0,
+        close_value=97.5,
+    ) == pytest.approx(2.5)
+
+
+def test_conditional_direction_move_thresholds_lock_step_specific_defaults() -> None:
+    metrics = load_metrics_module()
+
+    expected = {
+        1: {
+            "baseline_deviation_pct": 0.039886,
+            "lower_threshold_pct": 0.019886,
+            "upper_threshold_pct": 0.059886,
+        },
+        2: {
+            "baseline_deviation_pct": 0.057832,
+            "lower_threshold_pct": 0.037832,
+            "upper_threshold_pct": 0.077832,
+        },
+        3: {
+            "baseline_deviation_pct": 0.070966,
+            "lower_threshold_pct": 0.050966,
+            "upper_threshold_pct": 0.090966,
+        },
+        4: {
+            "baseline_deviation_pct": 0.081788,
+            "lower_threshold_pct": 0.061788,
+            "upper_threshold_pct": 0.101788,
+        },
+        5: {
+            "baseline_deviation_pct": 0.091254,
+            "lower_threshold_pct": 0.071254,
+            "upper_threshold_pct": 0.111254,
+        },
+    }
+
+    assert metrics.DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT == expected
+    assert {
+        step_ahead: metrics.conditional_direction_move_thresholds(step_ahead)
+        for step_ahead in range(1, 6)
+    } == expected
+
+
+def test_conditional_direction_move_thresholds_reject_unsupported_steps() -> None:
+    metrics = load_metrics_module()
+
+    with pytest.raises(ValueError, match="step_ahead must be one of 1, 2, 3, 4, or 5"):
+        metrics.conditional_direction_move_thresholds(6)
+
+
 def test_build_step_metrics_returns_reusable_per_step_inputs() -> None:
     metrics = load_metrics_module()
 

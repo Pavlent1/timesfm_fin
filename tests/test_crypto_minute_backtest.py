@@ -81,6 +81,128 @@ def build_backtest_frame() -> pd.DataFrame:
     )
 
 
+def build_conditional_window_rows() -> list[dict[str, object]]:
+    def build_step(
+        *,
+        step_index: int,
+        predicted_close: float,
+        actual_close: float,
+        direction_guess_correct: int,
+    ) -> dict[str, object]:
+        return {
+            "step_index": step_index,
+            "last_input_close": 100.0,
+            "predicted_close": predicted_close,
+            "actual_close": actual_close,
+            "direction_guess_correct": direction_guess_correct,
+        }
+
+    return [
+        {
+            "steps": [
+                build_step(
+                    step_index=0,
+                    predicted_close=100.04,
+                    actual_close=100.03,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=1,
+                    predicted_close=99.98,
+                    actual_close=100.05,
+                    direction_guess_correct=0,
+                ),
+                build_step(
+                    step_index=2,
+                    predicted_close=99.93,
+                    actual_close=99.94,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=3,
+                    predicted_close=100.11,
+                    actual_close=100.08,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=4,
+                    predicted_close=99.88,
+                    actual_close=99.89,
+                    direction_guess_correct=1,
+                ),
+            ]
+        },
+        {
+            "steps": [
+                build_step(
+                    step_index=0,
+                    predicted_close=99.99,
+                    actual_close=100.01,
+                    direction_guess_correct=0,
+                ),
+                build_step(
+                    step_index=1,
+                    predicted_close=99.97,
+                    actual_close=99.96,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=2,
+                    predicted_close=100.10,
+                    actual_close=100.04,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=3,
+                    predicted_close=99.85,
+                    actual_close=99.93,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=4,
+                    predicted_close=100.05,
+                    actual_close=100.15,
+                    direction_guess_correct=1,
+                ),
+            ]
+        },
+        {
+            "steps": [
+                build_step(
+                    step_index=0,
+                    predicted_close=99.85,
+                    actual_close=99.90,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=1,
+                    predicted_close=100.10,
+                    actual_close=100.09,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=2,
+                    predicted_close=100.05,
+                    actual_close=99.80,
+                    direction_guess_correct=0,
+                ),
+                build_step(
+                    step_index=3,
+                    predicted_close=100.04,
+                    actual_close=100.05,
+                    direction_guess_correct=1,
+                ),
+                build_step(
+                    step_index=4,
+                    predicted_close=99.94,
+                    actual_close=99.92,
+                    direction_guess_correct=1,
+                ),
+            ]
+        },
+    ]
+
+
 def seed_phase1_rows(conn, dataset_factory) -> None:
     series_id = dataset_factory.ensure_series(
         symbol="BTCUSDT",
@@ -412,6 +534,52 @@ def test_save_backtest_writes_run_window_and_step_rows(
     ]
 
 
+def test_build_conditional_direction_accuracy_rows_summarizes_actual_and_predicted_cohorts() -> None:
+    conditional_rows = crypto_minute_backtest.build_conditional_direction_accuracy_rows(
+        window_rows=build_conditional_window_rows()
+    )
+
+    assert len(conditional_rows) == 20
+
+    step1_actual_lower = next(
+        row
+        for row in conditional_rows
+        if row["step_ahead"] == 1
+        and row["threshold_basis"] == "actual_move_pct"
+        and row["threshold_band"] == "lower"
+    )
+    step3_predicted_upper = next(
+        row
+        for row in conditional_rows
+        if row["step_ahead"] == 3
+        and row["threshold_basis"] == "predicted_move_pct"
+        and row["threshold_band"] == "upper"
+    )
+
+    assert step1_actual_lower["threshold_pct"] == pytest.approx(0.019886)
+    assert step1_actual_lower["total_windows"] == 3
+    assert step1_actual_lower["qualified_windows"] == 2
+    assert step1_actual_lower["qualified_share_pct"] == pytest.approx(66.6666666667)
+    assert step1_actual_lower["qualified_correct_count"] == 2
+    assert step1_actual_lower["qualified_accuracy_pct"] == pytest.approx(100.0)
+    assert step1_actual_lower["non_qualified_accuracy_pct"] == pytest.approx(0.0)
+    assert step1_actual_lower["overall_accuracy_pct"] == pytest.approx(66.6666666667)
+    assert step1_actual_lower["accuracy_lift_vs_overall_pct_points"] == pytest.approx(
+        33.3333333333
+    )
+
+    assert step3_predicted_upper["threshold_pct"] == pytest.approx(0.090966)
+    assert step3_predicted_upper["qualified_windows"] == 1
+    assert step3_predicted_upper["qualified_share_pct"] == pytest.approx(33.3333333333)
+    assert step3_predicted_upper["qualified_correct_count"] == 1
+    assert step3_predicted_upper["qualified_accuracy_pct"] == pytest.approx(100.0)
+    assert step3_predicted_upper["non_qualified_accuracy_pct"] == pytest.approx(50.0)
+    assert step3_predicted_upper["overall_accuracy_pct"] == pytest.approx(66.6666666667)
+    assert step3_predicted_upper[
+        "accuracy_lift_vs_overall_pct_points"
+    ] == pytest.approx(33.3333333333)
+
+
 def test_main_uses_loaded_frame_bounds_for_saved_run_coverage(monkeypatch) -> None:
     partial_day_frame = pd.DataFrame(
         {
@@ -601,6 +769,9 @@ def test_render_backtest_report_includes_step_stats_table() -> None:
                 "direction_guess_accuracy_pct": 58.2,
             }
         ],
+        conditional_stats_rows=crypto_minute_backtest.build_conditional_direction_accuracy_rows(
+            window_rows=build_conditional_window_rows()
+        ),
     )
 
     assert "TimesFM Crypto Backtest Report" in report
@@ -613,6 +784,17 @@ def test_render_backtest_report_includes_step_stats_table() -> None:
     assert "avg_undershoot_deviation_pct" in report
     assert "direction_guess_accuracy_pct" in report
     assert "0.12" in report
+    assert "Conditional direction accuracy by move threshold" in report
+    assert (
+        "Threshold source: outputs/backtests/"
+        "followup_stats_btcusdt_2026-03-16_31d_next5.txt"
+    ) in report
+    assert "threshold_basis" in report
+    assert "actual_move_pct" in report
+    assert "predicted_move_pct" in report
+    assert "0.019886" in report
+    assert "qualified_accuracy_pct" in report
+    assert "accuracy_lift_vs_overall_pct_points" in report
 
 
 def test_render_backtest_report_shows_checkpoint_path_when_provided() -> None:
@@ -643,6 +825,7 @@ def test_render_backtest_report_shows_checkpoint_path_when_provided() -> None:
         metrics={"points": 1952, "windows": 288},
         run_id=100,
         step_stats_rows=[],
+        conditional_stats_rows=[],
     )
 
     assert "Checkpoint path: /workspace/outputs/training_runs/runs/demo/checkpoints/fine-tuning" in report

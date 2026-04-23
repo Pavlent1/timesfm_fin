@@ -9,7 +9,11 @@ import numpy as np
 import pandas as pd
 import psycopg
 
-from backtest_metrics import build_step_metrics
+from backtest_metrics import (
+    DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT,
+    absolute_move_pct_from_input,
+    build_step_metrics,
+)
 from binance_market_data import fetch_binance_klines
 from postgres_backtest import (
     create_backtest_run,
@@ -32,6 +36,23 @@ from run_forecast import DEFAULT_REPO_ID, build_model
 DEFAULT_SOURCE_NAME = "binance"
 DEFAULT_TIMEFRAME = "1m"
 BINANCE_SOURCE_ENDPOINT = "https://api.binance.com/api/v3/klines"
+CONDITIONAL_DIRECTION_THRESHOLD_REPORT_SOURCE = (
+    "outputs/backtests/followup_stats_btcusdt_2026-03-16_31d_next5.txt"
+)
+CONDITIONAL_DIRECTION_REPORT_COLUMNS = [
+    "step_ahead",
+    "threshold_basis",
+    "threshold_band",
+    "threshold_pct",
+    "total_windows",
+    "qualified_windows",
+    "qualified_share_pct",
+    "qualified_correct_count",
+    "qualified_accuracy_pct",
+    "non_qualified_accuracy_pct",
+    "overall_accuracy_pct",
+    "accuracy_lift_vs_overall_pct_points",
+]
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -529,6 +550,106 @@ def resolve_model_reference(args: argparse.Namespace) -> str:
     return str(args.repo_id)
 
 
+def flatten_backtest_step_rows(
+    window_rows: list[dict[str, object]],
+) -> list[dict[str, float | int]]:
+    flattened_rows: list[dict[str, float | int]] = []
+
+    for window_row in window_rows:
+        for step_row in window_row["steps"]:
+            step_ahead = int(step_row["step_index"]) + 1
+            last_input_close = float(step_row["last_input_close"])
+            predicted_close = float(step_row["predicted_close"])
+            actual_close = float(step_row["actual_close"])
+            flattened_rows.append(
+                {
+                    "step_ahead": step_ahead,
+                    "actual_move_pct": absolute_move_pct_from_input(
+                        last_input_close=last_input_close,
+                        close_value=actual_close,
+                    ),
+                    "predicted_move_pct": absolute_move_pct_from_input(
+                        last_input_close=last_input_close,
+                        close_value=predicted_close,
+                    ),
+                    "direction_guess_correct": int(step_row["direction_guess_correct"]),
+                }
+            )
+
+    return flattened_rows
+
+
+def accuracy_pct(rows: list[dict[str, float | int]]) -> float:
+    if not rows:
+        return float(np.nan)
+    correct_count = sum(int(row["direction_guess_correct"]) for row in rows)
+    return (correct_count / len(rows)) * 100.0
+
+
+def qualified_share_pct(qualified_windows: int, total_windows: int) -> float:
+    if total_windows == 0:
+        return 0.0
+    return (qualified_windows / total_windows) * 100.0
+
+
+def build_conditional_direction_accuracy_rows(
+    window_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    flattened_rows = flatten_backtest_step_rows(window_rows)
+    conditional_rows: list[dict[str, object]] = []
+
+    for step_ahead, thresholds in DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT.items():
+        step_rows = [
+            row for row in flattened_rows if int(row["step_ahead"]) == step_ahead
+        ]
+        total_windows = len(step_rows)
+        overall_accuracy = accuracy_pct(step_rows)
+
+        for threshold_basis in ("actual_move_pct", "predicted_move_pct"):
+            for threshold_band, threshold_key in (
+                ("lower", "lower_threshold_pct"),
+                ("upper", "upper_threshold_pct"),
+            ):
+                threshold_pct = float(thresholds[threshold_key])
+                qualified_rows = [
+                    row for row in step_rows if float(row[threshold_basis]) >= threshold_pct
+                ]
+                non_qualified_rows = [
+                    row for row in step_rows if float(row[threshold_basis]) < threshold_pct
+                ]
+                qualified_accuracy = accuracy_pct(qualified_rows)
+                non_qualified_accuracy = accuracy_pct(non_qualified_rows)
+
+                conditional_rows.append(
+                    {
+                        "step_ahead": step_ahead,
+                        "threshold_basis": threshold_basis,
+                        "threshold_band": threshold_band,
+                        "threshold_pct": threshold_pct,
+                        "total_windows": total_windows,
+                        "qualified_windows": len(qualified_rows),
+                        "qualified_share_pct": qualified_share_pct(
+                            len(qualified_rows),
+                            total_windows,
+                        ),
+                        "qualified_correct_count": sum(
+                            int(row["direction_guess_correct"])
+                            for row in qualified_rows
+                        ),
+                        "qualified_accuracy_pct": qualified_accuracy,
+                        "non_qualified_accuracy_pct": non_qualified_accuracy,
+                        "overall_accuracy_pct": overall_accuracy,
+                        "accuracy_lift_vs_overall_pct_points": (
+                            qualified_accuracy - overall_accuracy
+                            if qualified_rows and not np.isnan(overall_accuracy)
+                            else float(np.nan)
+                        ),
+                    }
+                )
+
+    return conditional_rows
+
+
 def render_backtest_report(
     *,
     args: argparse.Namespace,
@@ -540,6 +661,7 @@ def render_backtest_report(
     metrics: dict[str, float | int],
     run_id: int,
     step_stats_rows: list[dict[str, object]],
+    conditional_stats_rows: list[dict[str, object]],
 ) -> str:
     lines = [
         "TimesFM Crypto Backtest Report",
@@ -575,6 +697,31 @@ def render_backtest_report(
         lines.append(stats_frame.to_string(index=False))
     else:
         lines.append("No per-step stats found for this run.")
+
+    lines.extend(
+        [
+            "",
+            "Conditional direction accuracy by move threshold",
+            (
+                "Threshold source: "
+                f"{CONDITIONAL_DIRECTION_THRESHOLD_REPORT_SOURCE}"
+            ),
+        ]
+    )
+
+    if conditional_stats_rows:
+        conditional_frame = pd.DataFrame(
+            conditional_stats_rows,
+            columns=CONDITIONAL_DIRECTION_REPORT_COLUMNS,
+        )
+        lines.append(
+            conditional_frame.to_string(
+                index=False,
+                float_format=lambda value: f"{value:.6f}",
+            )
+        )
+    else:
+        lines.append("No conditional direction stats found for this run.")
 
     lines.append("")
     return "\n".join(lines)
@@ -766,6 +913,9 @@ def main() -> None:
         )
         report_path = args.output_report or default_backtest_report_path(run_id)
         step_stats_rows = query_backtest_step_stats(conn=conn, run_id=run_id)
+        conditional_stats_rows = build_conditional_direction_accuracy_rows(
+            window_rows=window_rows
+        )
         report_text = render_backtest_report(
             args=args,
             requested_start_dt=requested_start_dt,
@@ -776,6 +926,7 @@ def main() -> None:
             metrics=metrics,
             run_id=run_id,
             step_stats_rows=step_stats_rows,
+            conditional_stats_rows=conditional_stats_rows,
         )
         write_backtest_report(report_path, report_text)
         conn.commit()

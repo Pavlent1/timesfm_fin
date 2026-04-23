@@ -14,14 +14,73 @@ class StepMetrics(TypedDict):
     direction_guess_correct: int
 
 
+class ConditionalMoveThresholds(TypedDict):
+    baseline_deviation_pct: float
+    lower_threshold_pct: float
+    upper_threshold_pct: float
+
+
+DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT: dict[
+    int, ConditionalMoveThresholds
+] = {
+    1: {
+        "baseline_deviation_pct": 0.039886,
+        "lower_threshold_pct": 0.019886,
+        "upper_threshold_pct": 0.059886,
+    },
+    2: {
+        "baseline_deviation_pct": 0.057832,
+        "lower_threshold_pct": 0.037832,
+        "upper_threshold_pct": 0.077832,
+    },
+    3: {
+        "baseline_deviation_pct": 0.070966,
+        "lower_threshold_pct": 0.050966,
+        "upper_threshold_pct": 0.090966,
+    },
+    4: {
+        "baseline_deviation_pct": 0.081788,
+        "lower_threshold_pct": 0.061788,
+        "upper_threshold_pct": 0.101788,
+    },
+    5: {
+        "baseline_deviation_pct": 0.091254,
+        "lower_threshold_pct": 0.071254,
+        "upper_threshold_pct": 0.111254,
+    },
+}
+
+
 def _validate_actual_close(actual_close: float) -> None:
     if actual_close == 0.0:
         raise ValueError("actual_close must be non-zero for percentage metrics.")
 
 
+def _validate_reference_close(reference_close: float) -> None:
+    if reference_close == 0.0:
+        raise ValueError("reference close must be non-zero for percentage metrics.")
+
+
 def normalized_deviation_pct(*, predicted_close: float, actual_close: float) -> float:
     _validate_actual_close(actual_close)
     return abs((predicted_close / actual_close) - 1.0) * 100.0
+
+
+def absolute_move_pct_from_input(
+    *,
+    last_input_close: float,
+    close_value: float,
+) -> float:
+    _validate_reference_close(last_input_close)
+    return abs((close_value / last_input_close) - 1.0) * 100.0
+
+
+def conditional_direction_move_thresholds(
+    step_ahead: int,
+) -> ConditionalMoveThresholds:
+    if step_ahead not in DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT:
+        raise ValueError("step_ahead must be one of 1, 2, 3, 4, or 5.")
+    return dict(DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT[step_ahead])
 
 
 def classify_overshoot(
@@ -123,12 +182,16 @@ def build_step_metrics(
 
 
 __all__ = [
+    "ConditionalMoveThresholds",
+    "DEFAULT_CONDITIONAL_DIRECTION_MOVE_THRESHOLDS_PCT",
+    "absolute_move_pct_from_input",
     "OvershootLabel",
     "RelativeToInputLabel",
     "StepMetrics",
     "build_step_metrics",
     "classify_overshoot",
     "classify_relative_to_input",
+    "conditional_direction_move_thresholds",
     "direction_guess_correct",
     "normalized_deviation_pct",
     "signed_deviation_pct",
