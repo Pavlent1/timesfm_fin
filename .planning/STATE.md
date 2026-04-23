@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: verifying
 stopped_at: Awaiting Phase 03 human verification
-last_updated: "2026-04-16T15:59:00.000Z"
-last_activity: 2026-04-16 -- Completed 03-04 and 03-05, wrote verification artifacts, and paused for human validation
+last_updated: "2026-04-23T16:16:23.648Z"
+last_activity: 2026-04-23 -- Completed quick task 260418-qj7: implement per-step conditional backtest metrics for thresholded direction analysis
 progress:
   total_phases: 3
   completed_phases: 2
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-13)
 Phase: 03 (train-the-model-on-1-minute-crypto-candles) - VERIFYING
 Plan: 5 of 5
 Status: Awaiting human verification
-Last activity: 2026-04-16 -- Completed 03-04 and 03-05, then wrote 03-VERIFICATION.md and 03-HUMAN-UAT.md
+Last activity: 2026-04-23 -- Completed quick task 260418-qj7: implement per-step conditional backtest metrics for thresholded direction analysis
 
 Progress: [##########] 100%
 
@@ -103,6 +103,7 @@ None yet.
 | 260414-gyh | execute wave 1 of the global autotest plan | 2026-04-14 | working-tree | [260414-gyh-execute-wave-1-of-the-global-autotest-pl](./quick/260414-gyh-execute-wave-1-of-the-global-autotest-pl/) |
 | 260416-0w5 | fix backtest overshoot and undershoot metrics to report average percent magnitude | 2026-04-15 | working-tree | [260416-0w5-fix-backtest-overshoot-and-undershoot-me](./quick/260416-0w5-fix-backtest-overshoot-and-undershoot-me/) |
 | 260416-1nx | add per-step direction-above-below-last-input accuracy metric to backtests | 2026-04-15 | working-tree | [260416-1nx-add-per-step-direction-above-below-last-](./quick/260416-1nx-add-per-step-direction-above-below-last-/) |
+| 260418-qj7 | implement per-step conditional backtest metrics for thresholded direction analysis | 2026-04-23 | 71a07f6 | [260418-qj7-plan-conditional-backtest-metrics-for-pe](./quick/260418-qj7-plan-conditional-backtest-metrics-for-pe/) |
 
 ## Session Continuity
 

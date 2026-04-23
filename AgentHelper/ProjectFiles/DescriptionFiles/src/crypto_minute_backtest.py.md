@@ -18,13 +18,14 @@ Key responsibilities:
 - fetch recent Binance klines for live mode and persist them into PostgreSQL ingestion tables
 - batch forecast windows through TimesFM for faster rolling evaluation
 - store `market_data.backtest_runs`, `market_data.backtest_windows`, and `market_data.backtest_prediction_steps` rows through the shared helper layer, using the actual loaded candle span for persisted run coverage
-- write a plain-text backtest report under `outputs/backtests/` by default so operators can inspect run results and per-step stats, including per-output-candle direction-guess accuracy, without querying PostgreSQL manually
+- write a plain-text backtest report under `outputs/backtests/` by default so operators can inspect run results and per-step stats, including per-output-candle direction-guess accuracy and step-specific conditional direction cohorts, without querying PostgreSQL manually
+- derive the conditional direction-accuracy table in Python from in-memory window rows using the shared Phase 2 move-threshold defaults instead of adding new PostgreSQL schema
 - print run summaries that distinguish requested evaluation candles from the loaded lookback context, point operators to the per-step PostgreSQL view, and show the saved report path, then optionally export live forecasts to CSV
 
 Important interactions:
 
 - imports `DEFAULT_REPO_ID` and `build_model` from `src/run_forecast.py`
-- imports `build_step_metrics()` from `src/backtest_metrics.py`
+- imports `build_step_metrics()`, move-magnitude helpers, and the locked conditional threshold defaults from `src/backtest_metrics.py`
 - imports `create_backtest_run()`, `create_backtest_window()`, and `insert_backtest_steps()` from `src/postgres_backtest.py`
 - imports shared PostgreSQL connection and ingestion helpers from `src/postgres_dataset.py`
 - imports `fetch_binance_klines()` from `src/binance_market_data.py`
