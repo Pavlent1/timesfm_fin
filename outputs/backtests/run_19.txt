@@ -1,0 +1,63 @@
+TimesFM Crypto Backtest Report
+
+Run id: 19
+Exchange: Binance
+Symbol: BTCUSDT
+Requested UTC start: 2026-03-16T00:00:00+00:00
+Requested UTC end: 2026-04-16T00:00:00+00:00
+Requested days: 31
+Context length: 512
+Horizon length: 16
+Stride: 1
+Batch size: 64
+Backend: cpu
+Repo id: pfnet/timesfm-1.0-200m-fin
+Frequency bucket: 0
+Loaded candles: 45152
+Requested-range candles: 44640
+Context-lookback candles: 512
+Forecast windows: 44625
+PostgreSQL: host.docker.internal:54329/timesfm_fin
+
+Per-step stats (market_data.backtest_step_stats_vw)
+ run_id  step_index  step_count  avg_normalized_deviation_pct  stddev_normalized_deviation_pct  avg_overshoot_deviation_pct  avg_undershoot_deviation_pct  match_count  avg_signed_deviation_pct  direction_guess_accuracy_pct
+     19           0       44625                      0.052852                         0.055279                     0.028259                      0.060419            0                 -0.039553                     49.467787
+     19           1       44625                      0.068072                         0.073558                     0.028644                      0.077082            0                 -0.057416                     50.072829
+     19           2       44625                      0.079839                         0.087784                     0.028917                      0.089621            0                 -0.070519                     50.028011
+     19           3       44625                      0.090103                         0.100244                     0.029718                      0.100308            0                 -0.081511                     50.227451
+     19           4       44625                      0.099258                         0.111123                     0.029689                      0.110352            1                 -0.091093                     50.014566
+     19           5       44625                      0.108222                         0.120726                     0.032353                      0.119850            1                 -0.099625                     50.464986
+     19           6       44625                      0.115874                         0.129586                     0.032815                      0.127443            0                 -0.107850                     50.404482
+     19           7       44625                      0.123860                         0.138242                     0.034309                      0.135589            0                 -0.115914                     50.124370
+     19           8       44625                      0.130776                         0.146031                     0.035273                      0.142657            1                 -0.122973                     50.209524
+     19           9       44625                      0.137450                         0.153576                     0.036704                      0.149385            1                 -0.129678                     50.274510
+     19          10       44625                      0.144168                         0.160918                     0.037874                      0.156544            0                 -0.136268                     50.346218
+     19          11       44625                      0.150886                         0.167850                     0.039794                      0.163833            0                 -0.142578                     50.164706
+     19          12       44625                      0.156999                         0.174189                     0.041820                      0.170131            0                 -0.148440                     50.155742
+     19          13       44625                      0.163132                         0.180030                     0.043582                      0.176852            0                 -0.154159                     50.070588
+     19          14       44625                      0.168354                         0.185507                     0.045469                      0.182238            0                 -0.159122                     50.133333
+     19          15       44625                      0.173874                         0.191042                     0.046292                      0.188083            0                 -0.164596                     50.433613
+
+Conditional direction accuracy by move threshold
+Threshold source: outputs/backtests/followup_stats_btcusdt_2026-03-16_31d_next5.txt
+ step_ahead    threshold_basis threshold_band  threshold_pct  total_windows  qualified_windows  qualified_share_pct  qualified_correct_count  qualified_accuracy_pct  non_qualified_accuracy_pct  overall_accuracy_pct  accuracy_lift_vs_overall_pct_points
+          1    actual_move_pct          lower       0.019886          44625              26979            60.457143                    13524               50.127877                   48.458574             49.467787                             0.660090
+          1    actual_move_pct          upper       0.059886          44625               9215            20.649860                     4640               50.352686                   49.237504             49.467787                             0.884899
+          1 predicted_move_pct          lower       0.019886          44625              25714            57.622409                    12884               50.105001                   48.601343             49.467787                             0.637214
+          1 predicted_move_pct          upper       0.059886          44625               6752            15.130532                     3445               51.021919                   49.190716             49.467787                             1.554132
+          2    actual_move_pct          lower       0.037832          44625              22739            50.955742                    11447               50.340824                   49.794389             50.072829                             0.267995
+          2    actual_move_pct          upper       0.077832          44625              10787            24.172549                     5453               50.551590                   49.920208             50.072829                             0.478761
+          2 predicted_move_pct          lower       0.037832          44625              14762            33.080112                     7480               50.670641                   49.777316             50.072829                             0.597812
+          2 predicted_move_pct          upper       0.077832          44625               3894             8.726050                     1980               50.847458                   49.998772             50.072829                             0.774628
+          3    actual_move_pct          lower       0.050966          44625              21290            47.708683                    10759               50.535463                   49.565031             50.028011                             0.507451
+          3    actual_move_pct          upper       0.090966          44625              11495            25.759104                     5802               50.474119                   49.873227             50.028011                             0.446108
+          3 predicted_move_pct          lower       0.050966          44625               9904            22.193838                     5067               51.161147                   49.704790             50.028011                             1.133136
+          3 predicted_move_pct          upper       0.090966          44625               2801             6.276751                     1462               52.195644                   49.882842             50.028011                             2.167633
+          4    actual_move_pct          lower       0.061788          44625              20418            45.754622                    10386               50.866882                   49.688107             50.227451                             0.639431
+          4    actual_move_pct          upper       0.101788          44625              12063            27.031933                     6106               50.617591                   50.082919             50.227451                             0.390140
+          4 predicted_move_pct          lower       0.061788          44625               7255            16.257703                     3679               50.709855                   50.133797             50.227451                             0.482404
+          4 predicted_move_pct          upper       0.101788          44625               2214             4.961345                     1149               51.897019                   50.140294             50.227451                             1.669568
+          5    actual_move_pct          lower       0.071254          44625              19953            44.712605                    10010               50.167895                   49.890564             50.014566                             0.153329
+          5    actual_move_pct          upper       0.111254          44625              12426            27.845378                     6251               50.305810                   49.902171             50.014566                             0.291245
+          5 predicted_move_pct          lower       0.071254          44625               5662            12.687955                     2862               50.547510                   49.937120             50.014566                             0.532944
+          5 predicted_move_pct          upper       0.111254          44625               1826             4.091877                      936               51.259584                   49.961448             50.014566                             1.245018

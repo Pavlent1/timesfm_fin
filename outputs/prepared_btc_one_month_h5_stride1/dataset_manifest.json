@@ -1,0 +1,27 @@
+{
+  "source_name": "binance",
+  "timeframe": "1m",
+  "preset": null,
+  "window_length": 517,
+  "stride": 1,
+  "cleaning": {
+    "mode": "strict",
+    "repairable_gap_minutes": 5
+  },
+  "symbols": [
+    {
+      "symbol": "BTCUSDT",
+      "train_start_utc": "2026-02-01T00:00:00Z",
+      "train_end_utc": "2026-03-01T00:00:00Z",
+      "holdout_start_utc": "2026-03-01T00:00:00Z",
+      "holdout_end_utc": "2026-04-01T00:00:00Z"
+    }
+  ],
+  "manifest_id": "99a4d436f706c97a",
+  "sample_counts": {
+    "total": 39804,
+    "per_symbol": {
+      "BTCUSDT": 39804
+    }
+  }
+}

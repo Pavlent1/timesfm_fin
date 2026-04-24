@@ -1,0 +1,52 @@
+TimesFM Crypto Backtest Report
+
+Run id: 20
+Exchange: Binance
+Symbol: BTCUSDT
+Requested UTC start: 2026-03-13T00:00:00+00:00
+Requested UTC end: 2026-04-12T00:00:00+00:00
+Requested days: 30
+Context length: 512
+Horizon length: 5
+Stride: 1
+Batch size: 64
+Backend: gpu
+Repo id: pfnet/timesfm-1.0-200m-fin
+Frequency bucket: 0
+Loaded candles: 43712
+Requested-range candles: 43200
+Context-lookback candles: 512
+Forecast windows: 43196
+PostgreSQL: host.docker.internal:54329/timesfm_fin
+
+Per-step stats (market_data.backtest_step_stats_vw)
+ run_id  step_index  step_count  avg_normalized_deviation_pct  stddev_normalized_deviation_pct  avg_overshoot_deviation_pct  avg_undershoot_deviation_pct  match_count  avg_signed_deviation_pct  direction_guess_accuracy_pct
+     20           0       43196                      0.053067                         0.055388                     0.028040                      0.060893            0                 -0.039708                     49.270766
+     20           1       43196                      0.068263                         0.073863                     0.028707                      0.077425            0                 -0.057467                     50.043986
+     20           2       43196                      0.080095                         0.088249                     0.028880                      0.090128            0                 -0.070633                     50.064821
+     20           3       43196                      0.090440                         0.100723                     0.029704                      0.100809            0                 -0.081777                     49.891194
+     20           4       43196                      0.099560                         0.111693                     0.029931                      0.110752            0                 -0.091270                     49.805538
+
+Conditional direction accuracy by move threshold
+Threshold source: outputs/backtests/followup_stats_btcusdt_2026-03-16_31d_next5.txt
+ step_ahead    threshold_basis threshold_band  threshold_pct  total_windows  qualified_windows  qualified_share_pct  qualified_correct_count  qualified_accuracy_pct  non_qualified_accuracy_pct  overall_accuracy_pct  accuracy_lift_vs_overall_pct_points
+          1    actual_move_pct          lower       0.019886          43196              26068            60.348180                    13051               50.065214                   48.061653             49.270766                             0.794448
+          1    actual_move_pct          upper       0.059886          43196               8912            20.631540                     4487               50.347846                   48.990783             49.270766                             1.077080
+          1 predicted_move_pct          lower       0.019886          43196              25123            58.160478                    12534               49.890539                   48.409229             49.270766                             0.619773
+          1 predicted_move_pct          upper       0.059886          43196               6597            15.272247                     3332               50.507807                   49.047788             49.270766                             1.237041
+          2    actual_move_pct          lower       0.037832          43196              21896            50.689879                    11020               50.328827                   49.751174             50.043986                             0.284842
+          2    actual_move_pct          upper       0.077832          43196              10438            24.164274                     5230               50.105384                   50.024422             50.043986                             0.061399
+          2 predicted_move_pct          lower       0.037832          43196              14453            33.459117                     7341               50.792223                   49.667745             50.043986                             0.748238
+          2 predicted_move_pct          upper       0.077832          43196               3903             9.035559                     1987               50.909557                   49.958008             50.043986                             0.865571
+          3    actual_move_pct          lower       0.050966          43196              20473            47.395592                    10305               50.334587                   49.821766             50.064821                             0.269766
+          3    actual_move_pct          upper       0.090966          43196              11091            25.675989                     5570               50.220900                   50.010902             50.064821                             0.156079
+          3 predicted_move_pct          lower       0.050966          43196               9720            22.502084                     4942               50.843621                   49.838690             50.064821                             0.778801
+          3 predicted_move_pct          upper       0.090966          43196               2838             6.570053                     1478               52.078929                   49.923187             50.064821                             2.014108
+          4    actual_move_pct          lower       0.061788          43196              19628            45.439393                     9902               50.448339                   49.427189             49.891194                             0.557145
+          4    actual_move_pct          upper       0.101788          43196              11629            26.921474                     5843               50.245077                   49.760826             49.891194                             0.353883
+          4 predicted_move_pct          lower       0.061788          43196               7155            16.564034                     3627               50.691824                   49.732249             49.891194                             0.800630
+          4 predicted_move_pct          upper       0.101788          43196               2262             5.236596                     1166               51.547303                   49.799678             49.891194                             1.656110
+          5    actual_move_pct          lower       0.071254          43196              19146            44.323548                     9504               49.639611                   49.937630             49.805538                            -0.165926
+          5    actual_move_pct          upper       0.111254          43196              12023            27.833596                     5976               49.704733                   49.844417             49.805538                            -0.100805
+          5 predicted_move_pct          lower       0.071254          43196               5640            13.056765                     2859               50.691489                   49.672489             49.805538                             0.885952
+          5 predicted_move_pct          upper       0.111254          43196               1841             4.261969                      946               51.385117                   49.735219             49.805538                             1.579579

@@ -1,0 +1,7 @@
+{
+  "cleaning_mode": "strict",
+  "repairable_gap_minutes": 5,
+  "repairs": [],
+  "window_length": 640,
+  "stride": 128
+}

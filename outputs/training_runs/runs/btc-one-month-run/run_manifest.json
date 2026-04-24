@@ -1,0 +1,68 @@
+{
+  "phase": "03",
+  "status": "running",
+  "manual_only": true,
+  "run_name": "btc-one-month-run",
+  "run_dir": "/workspace/outputs/training_runs/runs/btc-one-month-run",
+  "produced_checkpoint": {
+    "kind": "local_path",
+    "value": "/workspace/outputs/training_runs/runs/btc-one-month-run"
+  },
+  "parent_checkpoint": {
+    "kind": "path",
+    "value": "/root/.cache/huggingface/hub/models--pfnet--timesfm-1.0-200m-fin/snapshots/bd9703cd3b456cdb0962050cbcd78d5043542184/checkpoints"
+  },
+  "prepared_bundle": {
+    "bundle_dir": "/workspace/outputs/prepared_btc_one_month",
+    "dataset_manifest_path": "/workspace/outputs/prepared_btc_one_month/dataset_manifest.json",
+    "dataset_manifest_id": "3826bea3ff7ea769",
+    "train_windows_path": "/workspace/outputs/prepared_btc_one_month/train_windows.csv",
+    "holdout_series_path": "/workspace/outputs/prepared_btc_one_month/holdout_series.csv",
+    "quality_report_path": "/workspace/outputs/prepared_btc_one_month/quality_report.json",
+    "sample_counts": {
+      "total": 311,
+      "per_symbol": {
+        "BTCUSDT": 311
+      }
+    },
+    "symbols": [
+      {
+        "symbol": "BTCUSDT",
+        "train_start_utc": "2026-02-01T00:00:00Z",
+        "train_end_utc": "2026-03-01T00:00:00Z",
+        "holdout_start_utc": "2026-03-01T00:00:00Z",
+        "holdout_end_utc": "2026-04-01T00:00:00Z"
+      }
+    ],
+    "cleaning": {
+      "mode": "strict",
+      "repairable_gap_minutes": 5
+    },
+    "window_length": 640,
+    "stride": 128
+  },
+  "training_config": {
+    "source_path": "/workspace/configs/fine_tuning.py",
+    "copied_path": "/workspace/outputs/training_runs/runs/btc-one-month-run/inputs/fine_tuning.py",
+    "source_sha256": "4f2bc6c4dbb54cae80e38c2e9c43583e3a6a2080386809ccdbd15bdf6c986e67",
+    "copied_sha256": "dc2671a48ff3683ee27e66781e20c7b4ca26610d899915ccf7df39a1d563d0e4",
+    "requested_batch_size": 1024,
+    "effective_batch_size": 233
+  },
+  "environment": {
+    "snapshot_path": "/workspace/outputs/training_runs/runs/btc-one-month-run/environment_snapshot.json"
+  },
+  "training_command": [
+    "/usr/local/bin/python",
+    "src/main.py",
+    "--workdir=outputs/training_runs/runs/btc-one-month-run",
+    "--config=outputs/training_runs/runs/btc-one-month-run/inputs/fine_tuning.py",
+    "--dataset_path=/workspace/outputs/prepared_btc_one_month/train_windows.csv",
+    "--backend=gpu",
+    "--checkpoint_path=/root/.cache/huggingface/hub/models--pfnet--timesfm-1.0-200m-fin/snapshots/bd9703cd3b456cdb0962050cbcd78d5043542184/checkpoints"
+  ],
+  "trainer_internal_eval": {
+    "canonical_for_phase3_comparison": false,
+    "reason": "The legacy trainer shuffle-eval is not the explicit Phase 3 holdout. Use evaluation_summary.json and backtest_summary.json for comparisons."
+  }
+}

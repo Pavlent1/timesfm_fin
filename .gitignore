@@ -170,3 +170,6 @@ logs/
 checkpoints/
 mock_trading/
 data_paths.py
+
+# generated prepared datasets are too large for normal git pushes
+outputs/prepared_*/train_windows.csv

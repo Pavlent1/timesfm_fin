@@ -1,0 +1,28 @@
+TimesFM Crypto Backtest Report
+
+Run id: 16
+Exchange: Binance
+Symbol: BTCUSDT
+Requested UTC start: 2026-03-13T00:00:00+00:00
+Requested UTC end: 2026-04-12T00:00:00+00:00
+Requested days: 30
+Context length: 512
+Horizon length: 5
+Stride: 5
+Batch size: 64
+Backend: gpu
+Checkpoint path: /workspace/outputs/training_runs/runs/btc-one-month-run-2ep-b1/checkpoints/fine-tuning-20260416-190820
+Frequency bucket: 0
+Loaded candles: 43712
+Requested-range candles: 43200
+Context-lookback candles: 512
+Forecast windows: 8640
+PostgreSQL: host.docker.internal:54329/timesfm_fin
+
+Per-step stats (market_data.backtest_step_stats_vw)
+ run_id  step_index  step_count  avg_normalized_deviation_pct  stddev_normalized_deviation_pct  avg_overshoot_deviation_pct  avg_undershoot_deviation_pct  match_count  avg_signed_deviation_pct  direction_guess_accuracy_pct
+     16           0        8640                      0.054936                         0.060378                     0.027313                      0.063266            0                 -0.042278                     50.613426
+     16           1        8640                      0.071317                         0.082347                     0.028820                      0.080419            0                 -0.061150                     50.798611
+     16           2        8640                      0.082670                         0.092617                     0.029702                      0.092895            0                 -0.073058                     50.787037
+     16           3        8640                      0.090652                         0.103077                     0.030037                      0.100847            0                 -0.082002                     50.462963
+     16           4        8640                      0.097468                         0.113424                     0.030022                      0.108749            0                 -0.088864                     50.127315

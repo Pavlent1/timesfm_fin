@@ -1,0 +1,31 @@
+{
+  "checkpoint_reference": "/workspace/outputs/training_runs/runs/btc-one-month-h5-s1-1ep-b1/checkpoints/fine-tuning-20260416-213724",
+  "checkpoint_kind": "path",
+  "holdout_series_path": "/workspace/outputs/prepared_btc_one_month_h5_stride1/holdout_series.csv",
+  "canonical_for_phase3_comparison": true,
+  "trainer_internal_eval_is_canonical": false,
+  "context_len": 512,
+  "horizon_len": 5,
+  "stride": 5,
+  "window_count": 8825,
+  "point_count": 44125,
+  "overall_metrics": {
+    "mae": 64.18243717067992,
+    "rmse": 95.13576846026486,
+    "mape_pct": 0.0921039421302082
+  },
+  "symbol_summaries": [
+    {
+      "symbol": "BTCUSDT",
+      "window_count": 8825,
+      "point_count": 44125,
+      "holdout_start_utc": "2026-03-01T00:00:00+00:00",
+      "holdout_end_utc": "2026-03-31T23:59:00+00:00",
+      "metrics": {
+        "mae": 64.18243717067992,
+        "rmse": 95.13576846026486,
+        "mape_pct": 0.0921039421302082
+      }
+    }
+  ]
+}
